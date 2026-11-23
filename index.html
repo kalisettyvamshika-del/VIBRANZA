@@ -1,2648 +1,775 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInAnonymously, 
-  signInWithCustomToken, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  onSnapshot, 
-  serverTimestamp 
-} from 'firebase/firestore';
-import {
-  Music,
-  Sparkles,
-  Calendar,
-  MapPin,
-  Ticket,
-  Users,
-  Clock,
-  ChevronRight,
-  ChevronDown,
-  Volume2,
-  VolumeX,
-  ArrowUp,
-  CheckCircle2,
-  Download,
-  Search,
-  Award,
-  Palette,
-  Gamepad2,
-  Mic2,
-  Flame,
-  ExternalLink,
-  X,
-  Menu,
-  Phone,
-  Mail,
-  ShieldCheck,
-  HelpCircle,
-  Radio,
-  Star,
-  Zap,
-  Info,
-  AlertCircle
-} from 'lucide-react';
 
-// ==========================================
-// FIREBASE INITIALIZATION (MANDATORY RULES)
-// ==========================================
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : {
-      apiKey: "demo-api-key",
-      authDomain: "vibranza-2026.firebaseapp.com",
-      projectId: "vibranza-2026",
-      storageBucket: "vibranza-2026.appspot.com",
-      messagingSenderId: "000000000000",
-      appId: "1:000000000000:web:000000000000"
-    };
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'vibranza-2026-fest';
-
-// ==========================================
-// DATA CONSTANTS
-// ==========================================
-const SCHEDULE_DATA = {
-  day1: [
-    {
-      time: "09:00 AM",
-      title: "Opening Ceremony & Lamp Lighting",
-      venue: "Main Open Air Arena",
-      tag: "Inaugural",
-      desc: "Grand festival kickoff with fusion percussion, flash mob, and official torch lighting.",
-      highlight: false
-    },
-    {
-      time: "10:30 AM",
-      title: "Nritya Sangram – Dance Competition",
-      venue: "Central Amphitheatre",
-      tag: "Dance",
-      desc: "High-voltage solo and crew dance face-offs across hip-hop, contemporary, and classical fusion.",
-      highlight: false
-    },
-    {
-      time: "01:00 PM",
-      title: "Swara – Music & Singing Showcase",
-      venue: "Main Auditorium",
-      tag: "Music",
-      desc: "Soulful acoustic melodies, playback vocals, and indie solo performances.",
-      highlight: false
-    },
-    {
-      time: "04:00 PM",
-      title: "Vogue Noir – Haute Couture Fashion Show",
-      venue: "Main Open Air Arena",
-      tag: "Glamour",
-      desc: "Avant-garde runway showcase blending cyberpunk neon aesthetics with traditional heritage.",
-      highlight: true
-    },
-    {
-      time: "07:00 PM",
-      title: "Electric Pulse – EDM & DJ Night",
-      venue: "Festival Main Stage",
-      tag: "Headliner",
-      desc: "Laser-drenched festival drop featuring DJ Vortex spinning progressive house & bass.",
-      highlight: true
-    }
-  ],
-  day2: [
-    {
-      time: "09:00 AM",
-      title: "Canvas & Shutter – Creative Events",
-      venue: "Design Studio & Campus Grounds",
-      tag: "Creative",
-      desc: "Live digital art battles, on-spot photography walks, and rapid poster design.",
-      highlight: false
-    },
-    {
-      time: "11:00 AM",
-      title: "Rangmanch – Drama & Street Theatre",
-      venue: "Nukkad Plaza & Auditorium",
-      tag: "Theatre",
-      desc: "Gripping stage plays and high-energy street theatre tackling bold modern themes.",
-      highlight: false
-    },
-    {
-      time: "02:00 PM",
-      title: "Decibel – Battle of Bands",
-      venue: "Festival Main Stage",
-      tag: "Rock / Indie",
-      desc: "Top college rock and fusion bands clash for the championship trophy and cash prize.",
-      highlight: true
-    },
-    {
-      time: "05:00 PM",
-      title: "Crowns of Vibranza – Prize Distribution",
-      venue: "Main Open Air Arena",
-      tag: "Awards",
-      desc: "Felicitation of winners, Best College Contingent trophy, and festival highlights.",
-      highlight: false
-    },
-    {
-      time: "07:00 PM",
-      title: "Starlight Symphony – Grand Finale Concert",
-      venue: "Festival Main Stage",
-      tag: "Grand Finale",
-      desc: "Live concert by The Echoes, mystery celebrity guest appearance, and pyrotechnic finale.",
-      highlight: true
-    }
-  ]
-};
-
-const PERFORMERS_DATA = [
-  {
-    id: "echoes",
-    name: "The Echoes",
-    role: "Indie Alt-Rock Live Band",
-    day: "Day 2 • 07:00 PM",
-    image: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=80",
-    accent: "from-purple-600 to-pink-500",
-    status: "Sample Lineup • Placeholder"
-  },
-  {
-    id: "vortex",
-    name: "DJ Vortex",
-    role: "EDM & Bass Headliner",
-    day: "Day 1 • 07:00 PM",
-    image: "https://images.unsplash.com/photo-1571266028243-e4733b0f0bb0?auto=format&fit=crop&w=900&q=80",
-    accent: "from-fuchsia-600 to-violet-600",
-    status: "Sample Lineup • Placeholder"
-  },
-  {
-    id: "rebels",
-    name: "Rhythm Rebels",
-    role: "Championship Street Dance Crew",
-    day: "Day 1 • 06:15 PM",
-    image: "https://images.unsplash.com/photo-1547153760-18fc86324498?auto=format&fit=crop&w=900&q=80",
-    accent: "from-violet-600 to-indigo-500",
-    status: "Sample Lineup • Placeholder"
-  },
-  {
-    id: "mystery",
-    name: "Special Guest",
-    role: "Celebrity Headliner • To Be Announced",
-    day: "Day 2 • 08:30 PM",
-    image: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80",
-    accent: "from-pink-600 to-purple-700",
-    isMystery: true,
-    status: "Official Reveal Coming Soon"
-  }
-];
-
-const EVENTS_DATA = [
-  // CULTURAL
-  {
-    id: "solo-dance",
-    title: "Solo Dance",
-    category: "Cultural",
-    type: "Individual",
-    prize: "₹15,000",
-    timing: "Day 1 • 10:30 AM",
-    image: "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Own the spotlight with freestyle, hip-hop, classical, or contemporary choreography.",
-    fullDesc: "An electrifying solo showdown where dancers express raw emotion, musicality, and technical mastery on the main amphitheatre stage.",
-    rules: [
-      "Performance duration: 3 to 4 minutes.",
-      "Submit audio track in MP3 format 24 hours prior.",
-      "Props allowed with prior safety approval; no fire or liquids."
-    ]
-  },
-  {
-    id: "group-dance",
-    title: "Group Dance",
-    category: "Cultural",
-    type: "Team (6–16)",
-    prize: "₹40,000",
-    timing: "Day 1 • 12:00 PM",
-    image: "https://images.unsplash.com/photo-1535525153412-5a42439a210d?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Synchronized formations, explosive energy, and crew choreography battles.",
-    fullDesc: "Bring your crew and set the stage ablaze with high-impact formations, transitions, and theatrical storytelling.",
-    rules: [
-      "Team size: 6 to 16 members from the same institution.",
-      "Time limit: 6 to 8 minutes including stage setup.",
-      "Judged on synchronization, choreography, energy, and costume."
-    ]
-  },
-  {
-    id: "singing",
-    title: "Singing",
-    category: "Cultural",
-    type: "Individual / Duet",
-    prize: "₹15,000",
-    timing: "Day 1 • 01:00 PM",
-    image: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Captivate the audience with vocal range, soul, and live stage presence.",
-    fullDesc: "From Bollywood soul to Western pop and indie originals, showcase your vocal brilliance with backing tracks or one acoustic accompanist.",
-    rules: [
-      "Time limit: 4 minutes maximum.",
-      "Karaoke track or maximum 1 live acoustic instrument allowed.",
-      "Auto-tune or pre-recorded lead vocals are strictly prohibited."
-    ]
-  },
-  {
-    id: "fashion-show",
-    title: "Fashion Show",
-    category: "Cultural",
-    type: "Team (8–14)",
-    prize: "₹35,000",
-    timing: "Day 1 • 04:00 PM",
-    image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "High-fashion runway walk blending futuristic neon themes with bold styling.",
-    fullDesc: "Vogue Noir invites college fashion societies to conceptualize, style, and walk a themed couture collection under concert spotlights.",
-    rules: [
-      "Theme: 'Neon Renaissance' or Open Conceptual Theme.",
-      "Team size: 8 to 14 models plus 2 backstage coordinators.",
-      "Stage time: 8 to 10 minutes including background score."
-    ]
-  },
-  {
-    id: "drama",
-    title: "Drama",
-    category: "Cultural",
-    type: "Team (5–15)",
-    prize: "₹25,000",
-    timing: "Day 2 • 11:00 AM",
-    image: "https://images.unsplash.com/photo-1503095396549-807759245b35?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Powerful storytelling, theatrical acting, and compelling stage direction.",
-    fullDesc: "Command the stage with original scripts, dramatic monologues, and gripping ensemble performances in English or Hindi.",
-    rules: [
-      "Performance duration: 12 to 15 minutes.",
-      "Minimalist props allowed; teams must clear stage within 2 minutes.",
-      "Original scripts earn bonus creativity points."
-    ]
-  },
-
-  // CREATIVE
-  {
-    id: "photography",
-    title: "Photography",
-    category: "Creative",
-    type: "Individual",
-    prize: "₹10,000",
-    timing: "Day 1 & 2 • All Day",
-    image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Capture raw festival emotions, neon lights, and candid campus moments.",
-    fullDesc: "Roam the festival grounds with your DSLR, mirrorless, or smartphone camera and submit your best 3 unedited/lightly graded frames.",
-    rules: [
-      "Photos must be shot during VIBRANZA 2026 on campus.",
-      "EXIF metadata must be intact for verification.",
-      "Basic color correction allowed; no AI generation or compositing."
-    ]
-  },
-  {
-    id: "short-film",
-    title: "Short Film",
-    category: "Creative",
-    type: "Team (1–6)",
-    prize: "₹20,000",
-    timing: "Day 2 • 10:00 AM",
-    image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Screen your cinematic vision in front of filmmakers and festival crowds.",
-    fullDesc: "An indie cinema showcase celebrating narrative storytelling, cinematography, sound design, and crisp editing.",
-    rules: [
-      "Runtime: 3 to 7 minutes including credits.",
-      "English subtitles mandatory for non-English films.",
-      "Must be an original student production created in 2026."
-    ]
-  },
-  {
-    id: "digital-art",
-    title: "Digital Art",
-    category: "Creative",
-    type: "Individual",
-    prize: "₹10,000",
-    timing: "Day 2 • 09:00 AM",
-    image: "https://images.unsplash.com/photo-1563089145-599997674d42?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Create futuristic cyber-art and surreal illustrations live on prompt.",
-    fullDesc: "Armed with your tablet or laptop, bring a surprise festival prompt to life in 2.5 hours of pure digital creativity.",
-    rules: [
-      "Participants must bring their own laptop/iPad and stylus.",
-      "Time limit: 150 minutes; surprise theme revealed at start.",
-      "Layer file (.PSD/.PROCREATE/.AI) must be submitted alongside PNG."
-    ]
-  },
-  {
-    id: "poster-design",
-    title: "Poster Design",
-    category: "Creative",
-    type: "Individual",
-    prize: "₹8,000",
-    timing: "Day 2 • 09:30 AM",
-    image: "https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Bold typography and visual communication crafted under tight deadlines.",
-    fullDesc: "Design an iconic festival or social-impact poster using either digital design suites or traditional mixed-media illustration.",
-    rules: [
-      "Duration: 2 hours.",
-      "Both digital (Figma/Illustrator) and hand-painted categories open.",
-      "Judged on visual hierarchy, originality, and message clarity."
-    ]
-  },
-
-  // FUN
-  {
-    id: "treasure-hunt",
-    title: "Treasure Hunt",
-    category: "Fun",
-    type: "Team (3–5)",
-    prize: "₹12,000",
-    timing: "Day 1 • 02:30 PM",
-    image: "https://images.unsplash.com/photo-1511882150382-421056c89033?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Decode cryptic clues, race across campus landmarks, and unlock the vault.",
-    fullDesc: "A high-adrenaline campus-wide quest filled with riddles, QR ciphers, physical checkpoints, and decoy trails.",
-    rules: [
-      "Teams of 3 to 5 members must stay together at checkpoints.",
-      "Use of campus vehicles is strictly prohibited.",
-      "First team to crack the final vault code wins."
-    ]
-  },
-  {
-    id: "gaming",
-    title: "Gaming",
-    category: "Fun",
-    type: "Solo / Squad",
-    prize: "₹25,000",
-    timing: "Day 1 & 2 • 11:00 AM",
-    image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "E-Sports arena featuring Valorant, BGMI, and EA FC knockout tournaments.",
-    fullDesc: "Compete in front of live shoutcasters in our dedicated RGB LAN gaming arena for the Vibranza E-Sports Crown.",
-    rules: [
-      "Titles: Valorant (5v5), BGMI (4v4), and EA FC 26 (1v1).",
-      "Bring your own peripherals/headphones if preferred.",
-      "Zero tolerance for third-party scripts or toxic behavior."
-    ]
-  },
-  {
-    id: "fun-challenges",
-    title: "Fun Challenges",
-    category: "Fun",
-    type: "Individual",
-    prize: "Goodies & Cash",
-    timing: "Day 1 & 2 • Drop-in",
-    image: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Minute-to-win-it games, silent disco battles, and rapid-fire trivia.",
-    fullDesc: "Jump into spontaneous carnival games at the Neon Fun Zone and win instant merch, food vouchers, and VIP pit upgrades.",
-    rules: [
-      "Open to all registered festival pass holders.",
-      "Multiple mini-rounds every hour from 11 AM to 5 PM.",
-      "Instant leaderboard prizes."
-    ]
-  },
-  {
-    id: "team-activities",
-    title: "Team Activities",
-    category: "Fun",
-    type: "Team (4–6)",
-    prize: "₹15,000",
-    timing: "Day 2 • 01:00 PM",
-    image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=80",
-    shortDesc: "Tug-of-war, relay obstacle courses, and squad synergy challenges.",
-    fullDesc: "Test your squad's coordination, speed, and spirit in high-energy outdoor arena games cheered on by the entire campus.",
-    rules: [
-      "Squad of 4 to 6 participants (co-ed teams encouraged).",
-      "Athletic footwear mandatory.",
-      "Knockout bracket format leading to the Sunset Finale."
-    ]
-  }
-];
-
-const FAQ_DATA = [
-  {
-    q: "Who can participate in VIBRANZA 2026?",
-    a: "All undergraduate and postgraduate students from any recognized college or university with a valid student ID card are welcome to participate and attend."
-  },
-  {
-    q: "Is there a registration fee for events or concert nights?",
-    a: "General festival entry and online event pre-registration are open now! Certain flagship competitions or pro-show pit passes may require nominal verification at the campus desk."
-  },
-  {
-    q: "Can I participate in multiple events?",
-    a: "Yes! You can register for multiple events as long as their scheduled timings do not clash. Submit a separate registration per event to receive individual event passes."
-  },
-  {
-    q: "How do team registrations work?",
-    a: "Select 'Team Participation' in the registration form, enter your Team Name and member count, and the team leader will receive the primary Registration ID."
-  },
-  {
-    q: "What should I bring on the day of the festival?",
-    a: "Bring your physical College ID card, a valid government photo ID, and your downloaded VIBRANZA 2026 Digital Festival Pass (either printed or on your phone)."
-  }
-];
-
-// ==========================================
-// MAIN APPLICATION COMPONENT
-// ==========================================
-export default function App() {
-  // Authentication & Firestore State
-  const [user, setUser] = useState(null);
-  const [registrations, setRegistrations] = useState([]);
-  const [dbError, setDbError] = useState(null);
-
-  // UI & Navigation State
-  const [loading, setLoading] = useState(true);
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showBackToTop, setShowBackToTop] = useState(false);
-
-  // Custom Cursor State (Desktop)
-  const [cursorPos, setCursorPos] = useState({ x: -100, y: -100 });
-  const [cursorHover, setCursorHover] = useState(false);
-
-  // Ambient Web Audio Synthesizer State (Muted by default)
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const audioCtxRef = useRef(null);
-  const audioIntervalRef = useRef(null);
-
-  // Countdown State (Target: Dec 18, 2026 09:00:00)
-  const [timeLeft, setTimeLeft] = useState({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0
-  });
-
-  // Schedule Day Toggle
-  const [activeScheduleDay, setActiveScheduleDay] = useState('day1');
-
-  // Events Filter & Modal State
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedEventModal, setSelectedEventModal] = useState(null);
-
-  // Registration Form State
-  const [activeRegTab, setActiveRegTab] = useState('register'); // 'register' | 'lookup'
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    college: '',
-    department: '',
-    year: '',
-    event: '',
-    participationType: 'Individual',
-    teamName: '',
-    teamSize: '2'
-  });
-  const [formErrors, setFormErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmedPass, setConfirmedPass] = useState(null);
-
-  // Pass Lookup State
-  const [lookupQuery, setLookupQuery] = useState('');
-  const [lookupResult, setLookupResult] = useState(null);
-  const [lookupSearched, setLookupSearched] = useState(false);
-
-  // FAQ & Legal Modal State
-  const [openFaqIndex, setOpenFaqIndex] = useState(0);
-  const [legalModal, setLegalModal] = useState(null); // 'terms' | 'privacy' | null
-
-  // Particle Canvas Ref
-  const particleCanvasRef = useRef(null);
-
-  // ------------------------------------------
-  // 1. FIREBASE AUTHENTICATION (RULE 3)
-  // ------------------------------------------
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) {
-        console.error("Auth initialization error:", err);
-        setDbError("Cloud sync temporarily offline. Check connection.");
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // ------------------------------------------
-  // 2. FIRESTORE LISTENER (RULE 1 & RULE 2)
-  // ------------------------------------------
-  useEffect(() => {
-    if (!user) return;
-    const regCollection = collection(db, 'artifacts', appId, 'public', 'data', 'registrations');
-    const unsubscribe = onSnapshot(
-      regCollection,
-      (snapshot) => {
-        const list = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setRegistrations(list);
-        setDbError(null);
-      },
-      (error) => {
-        console.error("Firestore listener error:", error);
-        setDbError("Unable to sync live pass count.");
-      }
-    );
-    return () => unsubscribe();
-  }, [user]);
-
-  // ------------------------------------------
-  // 3. PRELOADER & SCROLL EFFECTS
-  // ------------------------------------------
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1400);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 40);
-      setShowBackToTop(window.scrollY > 550);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // ------------------------------------------
-  // 4. DESKTOP CUSTOM NEON CURSOR
-  // ------------------------------------------
-  useEffect(() => {
-    const moveCursor = (e) => {
-      setCursorPos({ x: e.clientX, y: e.clientY });
-      const target = e.target;
-      const isClickable =
-        target.closest('button') ||
-        target.closest('a') ||
-        target.closest('input') ||
-        target.closest('select');
-      setCursorHover(Boolean(isClickable));
-    };
-    window.addEventListener('mousemove', moveCursor, { passive: true });
-    return () => window.removeEventListener('mousemove', moveCursor);
-  }, []);
-
-  // ------------------------------------------
-  // 5. LIVE COUNTDOWN TO DEC 18, 2026
-  // ------------------------------------------
-  useEffect(() => {
-    const targetDate = new Date('2026-12-18T09:00:00').getTime();
-
-    const updateTimer = () => {
-      const now = Date.now();
-      const diff = Math.max(0, targetDate - now);
-      setTimeLeft({
-        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((diff / 1000 / 60) % 60),
-        seconds: Math.floor((diff / 1000) % 60)
-      });
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // ------------------------------------------
-  // 6. FLOATING NEON PARTICLES CANVAS
-  // ------------------------------------------
-  useEffect(() => {
-    const canvas = particleCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let animId;
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener('resize', resize);
-
-    const colors = ['#A020F0', '#8B35FF', '#FF28B9', '#E0AAFF'];
-    const particles = Array.from({ length: 45 }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      r: Math.random() * 2.4 + 0.8,
-      dx: (Math.random() - 0.5) * 0.45,
-      dy: -Math.random() * 0.55 - 0.15,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      alpha: Math.random() * 0.6 + 0.2
-    }));
-
-    const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      particles.forEach((p) => {
-        p.x += p.dx;
-        p.y += p.dy;
-        if (p.y < -10) {
-          p.y = canvas.height + 10;
-          p.x = Math.random() * canvas.width;
-        }
-        if (p.x < -10) p.x = canvas.width + 10;
-        if (p.x > canvas.width + 10) p.x = -10;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.alpha;
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = p.color;
-        ctx.fill();
-      });
-      ctx.globalAlpha = 1;
-      animId = requestAnimationFrame(render);
-    };
-
-    render();
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener('resize', resize);
-    };
-  }, []);
-
-  // ------------------------------------------
-  // 7. WEB AUDIO SYNTHESIZER (FESTIVAL VIBE)
-  // ------------------------------------------
-  const toggleAmbientAudio = () => {
-    if (isPlayingAudio) {
-      if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close();
-        audioCtxRef.current = null;
-      }
-      setIsPlayingAudio(false);
-      return;
-    }
-
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioContext();
-      audioCtxRef.current = ctx;
-
-      // Ambient synthwave arpeggio + warm sub pulse
-      const notes = [110, 130.81, 164.81, 196.0, 220.0, 196.0, 164.81, 130.81];
-      let step = 0;
-
-      const playStep = () => {
-        if (!audioCtxRef.current || audioCtxRef.current.state !== 'running') return;
-        const now = ctx.currentTime;
-
-        // Synth pluck
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const filter = ctx.createBiquadFilter();
-
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(notes[step % notes.length], now);
-
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(650, now);
-        filter.frequency.exponentialRampToValueAtTime(180, now + 0.35);
-
-        gain.gain.setValueAtTime(0.04, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(now);
-        osc.stop(now + 0.4);
-
-        // Soft kick on every 4th step
-        if (step % 4 === 0) {
-          const kick = ctx.createOscillator();
-          const kickGain = ctx.createGain();
-          kick.type = 'sine';
-          kick.frequency.setValueAtTime(115, now);
-          kick.frequency.exponentialRampToValueAtTime(38, now + 0.18);
-
-          kickGain.gain.setValueAtTime(0.11, now);
-          kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-          kick.connect(kickGain);
-          kickGain.connect(ctx.destination);
-          kick.start(now);
-          kick.stop(now + 0.24);
-        }
-
-        step++;
-      };
-
-      playStep();
-      audioIntervalRef.current = setInterval(playStep, 260);
-      setIsPlayingAudio(true);
-    } catch (e) {
-      console.error("Audio playback failed:", e);
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (audioIntervalRef.current) clearInterval(audioIntervalRef.current);
-      if (audioCtxRef.current) audioCtxRef.current.close();
-    };
-  }, []);
-
-  // ------------------------------------------
-  // HELPERS & ACTIONS
-  // ------------------------------------------
-  const scrollToSection = (id) => {
-    setMobileMenuOpen(false);
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const handleSelectEventForRegistration = (eventTitle) => {
-    setSelectedEventModal(null);
-    setActiveRegTab('register');
-    setConfirmedPass(null);
-    setFormData((prev) => ({
-      ...prev,
-      event: eventTitle
-    }));
-    scrollToSection('register');
-  };
-
-  const filteredEvents = useMemo(() => {
-    if (selectedCategory === 'All') return EVENTS_DATA;
-    return EVENTS_DATA.filter((ev) => ev.category === selectedCategory);
-  }, [selectedCategory]);
-
-  // Form Validation
-  const validateForm = () => {
-    const errors = {};
-    if (!formData.fullName.trim() || formData.fullName.trim().length < 2) {
-      errors.fullName = 'Please enter your full name.';
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email.trim())) {
-      errors.email = 'Enter a valid email address.';
-    }
-    const cleanPhone = formData.phone.replace(/\D/g, '');
-    if (cleanPhone.length !== 10) {
-      errors.phone = 'Enter a valid 10-digit mobile number.';
-    }
-    if (!formData.college.trim()) {
-      errors.college = 'College / Institution name is required.';
-    }
-    if (!formData.department.trim()) {
-      errors.department = 'Department / Stream is required.';
-    }
-    if (!formData.year) {
-      errors.year = 'Select your current year of study.';
-    }
-    if (!formData.event) {
-      errors.event = 'Please choose an event or pass.';
-    }
-    if (formData.participationType === 'Team' && !formData.teamName.trim()) {
-      errors.teamName = 'Enter a team name for squad participation.';
-    }
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  // Submit Registration to Firebase Firestore
-  const handleRegistrationSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    setSubmitting(true);
-    try {
-      const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const registrationId = `VIB26-${randomCode}`;
-
-      const payload = {
-        registrationId,
-        fullName: formData.fullName.trim(),
-        email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.replace(/\D/g, ''),
-        college: formData.college.trim(),
-        department: formData.department.trim(),
-        year: formData.year,
-        event: formData.event,
-        participationType: formData.participationType,
-        teamName: formData.participationType === 'Team' ? formData.teamName.trim() : 'N/A',
-        teamSize: formData.participationType === 'Team' ? formData.teamSize : '1',
-        createdByUid: user?.uid || 'anonymous',
-        createdAt: serverTimestamp()
-      };
-
-      const regCollection = collection(db, 'artifacts', appId, 'public', 'data', 'registrations');
-      await addDoc(regCollection, payload);
-
-      setConfirmedPass(payload);
-    } catch (error) {
-      console.error("Registration save failed:", error);
-      setFormErrors({
-        submit: "Could not save registration to cloud right now. Please try again."
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Download VIP Digital Pass as High-Res PNG
-  const downloadFestivalPass = (passData) => {
-    if (!passData) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = 900;
-    canvas.height = 460;
-    const ctx = canvas.getContext('2d');
-
-    // Background Gradient
-    const bgGrad = ctx.createLinearGradient(0, 0, 900, 460);
-    bgGrad.addColorStop(0, '#080510');
-    bgGrad.addColorStop(0.5, '#190A33');
-    bgGrad.addColorStop(1, '#2B0938');
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, 900, 460);
-
-    // Neon Border
-    const borderGrad = ctx.createLinearGradient(0, 0, 900, 0);
-    borderGrad.addColorStop(0, '#A020F0');
-    borderGrad.addColorStop(0.5, '#FF28B9');
-    borderGrad.addColorStop(1, '#8B35FF');
-    ctx.strokeStyle = borderGrad;
-    ctx.lineWidth = 6;
-    ctx.strokeRect(14, 14, 872, 432);
-
-    // Stub Divider Line
-    ctx.setLineDash([8, 8]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(640, 20);
-    ctx.lineTo(640, 440);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Header
-    ctx.fillStyle = '#FF28B9';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillText('OFFICIAL FESTIVAL ENTRY PASS', 45, 62);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 46px sans-serif';
-    ctx.fillText('VIBRANZA 2026', 45, 115);
-
-    ctx.fillStyle = '#D8B4FE';
-    ctx.font = '18px sans-serif';
-    ctx.fillText('18–19 DECEMBER 2026  •  COLLEGE MAIN CAMPUS', 45, 148);
-
-    // Attendee Info
-    ctx.fillStyle = '#A78BFA';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText('ATTENDEE', 45, 205);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 26px sans-serif';
-    ctx.fillText(passData.fullName.toUpperCase(), 45, 235);
-
-    ctx.fillStyle = '#A78BFA';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText('REGISTERED EVENT', 45, 285);
-    ctx.fillStyle = '#FF28B9';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.fillText(`${passData.event} (${passData.participationType})`, 45, 315);
-
-    ctx.fillStyle = '#A78BFA';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText('INSTITUTION & DEPT', 45, 365);
-    ctx.fillStyle = '#E9D5FF';
-    ctx.font = '18px sans-serif';
-    ctx.fillText(`${passData.college} • ${passData.department} (${passData.year})`, 45, 392);
-
-    // Right Stub: Registration ID & Faux QR Matrix
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText('PASS ID', 675, 65);
-
-    ctx.fillStyle = '#FF28B9';
-    ctx.font = 'bold 24px monospace';
-    ctx.fillText(passData.registrationId, 675, 96);
-
-    // Stylized QR Matrix Box
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(675, 125, 175, 175);
-    ctx.fillStyle = '#080510';
-    for (let r = 0; r < 9; r++) {
-      for (let c = 0; c < 9; c++) {
-        const seed = (passData.registrationId.charCodeAt((r + c) % passData.registrationId.length) + r * 7 + c * 13) % 3;
-        if (seed !== 0 || (r < 2 && c < 2) || (r > 6 && c < 2) || (r < 2 && c > 6)) {
-          ctx.fillRect(688 + c * 17, 138 + r * 17, 13, 13);
-        }
-      }
-    }
-
-    ctx.fillStyle = '#D8B4FE';
-    ctx.font = '13px sans-serif';
-    ctx.fillText('Present at Entry Gate', 693, 330);
-    ctx.fillText('with Valid College ID', 696, 350);
-
-    const link = document.createElement('a');
-    link.download = `${passData.registrationId}-VIBRANZA2026-Pass.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  };
-
-  // Lookup Existing Registration
-  const handleLookupPass = (e) => {
-    e.preventDefault();
-    const q = lookupQuery.trim().toLowerCase();
-    if (!q) return;
-    const found = registrations.find(
-      (r) =>
-        r.registrationId?.toLowerCase() === q ||
-        r.email?.toLowerCase() === q ||
-        r.phone === q.replace(/\D/g, '')
-    );
-    setLookupResult(found || null);
-    setLookupSearched(true);
-  };
-
-  // ==========================================
-  // RENDER
-  // ==========================================
-  return (
-    <div className="min-h-screen bg-[#080510] text-white selection:bg-[#FF28B9] selection:text-white overflow-x-hidden font-sans relative">
-      {/* Google Fonts & Custom Keyframe Styles */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Syne:wght@700;800&display=swap');
-
-        body {
-          background-color: #080510;
-          font-family: 'Outfit', sans-serif;
-        }
-        .font-display {
-          font-family: 'Syne', sans-serif;
-        }
-        .font-script {
-          font-family: 'Caveat', cursive;
-        }
-        @keyframes pulseSlow {
-          0%, 100% { opacity: 0.45; transform: scale(1); }
-          50% { opacity: 0.85; transform: scale(1.06); }
-        }
-        @keyframes floatSlow {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-14px) rotate(4deg); }
-        }
-        @keyframes laserSweepLeft {
-          0%, 100% { transform: rotate(-22deg) skewX(-10deg); opacity: 0.45; }
-          50% { transform: rotate(-8deg) skewX(-5deg); opacity: 0.8; }
-        }
-        @keyframes laserSweepRight {
-          0%, 100% { transform: rotate(22deg) skewX(10deg); opacity: 0.45; }
-          50% { transform: rotate(8deg) skewX(5deg); opacity: 0.8; }
-        }
-        .animate-pulse-slow {
-          animation: pulseSlow 5s ease-in-out infinite;
-        }
-        .animate-float {
-          animation: floatSlow 4.5s ease-in-out infinite;
-        }
-        .animate-laser-left {
-          animation: laserSweepLeft 6s ease-in-out infinite;
-        }
-        .animate-laser-right {
-          animation: laserSweepRight 7s ease-in-out infinite;
-        }
-        .glass-card {
-          background: rgba(20, 12, 38, 0.62);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
-          border: 1px solid rgba(160, 32, 240, 0.28);
-        }
-        .glass-card-hover {
-          transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-        }
-        .glass-card-hover:hover {
-          border-color: rgba(255, 40, 185, 0.7);
-          box-shadow: 0 0 32px rgba(160, 32, 240, 0.32), 0 0 14px rgba(255, 40, 185, 0.22);
-          transform: translateY(-5px);
-        }
-        .neon-text-glow {
-          text-shadow: 0 0 24px rgba(160, 32, 240, 0.75), 0 0 54px rgba(255, 40, 185, 0.45);
-        }
-      `}</style>
-
-      {/* ==========================================
-          CUSTOM PRELOADER SCREEN
-         ========================================== */}
-      {loading && (
-        <div className="fixed inset-0 z-[100] bg-[#080510] flex flex-col items-center justify-center transition-opacity duration-500">
-          <div className="relative flex items-center justify-center">
-            <div className="w-28 h-28 rounded-full border-2 border-t-[#FF28B9] border-r-[#A020F0] border-b-[#8B35FF] border-l-transparent animate-spin" />
-            <div className="absolute inset-3 rounded-full bg-gradient-to-tr from-[#A020F0]/30 to-[#FF28B9]/30 blur-md animate-pulse" />
-            <Sparkles className="w-9 h-9 text-[#FF28B9] absolute animate-pulse" />
-          </div>
-          <h2 className="font-display text-3xl sm:text-4xl font-extrabold tracking-widest mt-6 bg-gradient-to-r from-[#E0AAFF] via-[#FF28B9] to-[#8B35FF] bg-clip-text text-transparent">
-            VIBRANZA 2026
-          </h2>
-          <p className="font-script text-2xl text-purple-300 mt-1 tracking-wide">
-            Tuning the frequencies...
-          </p>
-        </div>
-      )}
-
-      {/* ==========================================
-          DESKTOP CUSTOM NEON CURSOR GLOW
-         ========================================== */}
-      <div
-        className="hidden lg:block pointer-events-none fixed z-[90] rounded-full transition-transform duration-150 ease-out mix-blend-screen"
-        style={{
-          left: cursorPos.x,
-          top: cursorPos.y,
-          width: cursorHover ? '52px' : '28px',
-          height: cursorHover ? '52px' : '28px',
-          transform: 'translate(-50%, -50%)',
-          background: cursorHover
-            ? 'radial-gradient(circle, rgba(255,40,185,0.65) 0%, rgba(160,32,240,0.2) 60%, transparent 100%)'
-            : 'radial-gradient(circle, rgba(160,32,240,0.75) 0%, rgba(139,53,255,0.2) 65%, transparent 100%)',
-          border: cursorHover ? '1.5px solid rgba(255,40,185,0.9)' : '1px solid rgba(216,180,254,0.6)'
-        }}
-      />
-
-      {/* ==========================================
-          GLOBAL FLOATING NEON PARTICLES CANVAS
-         ========================================== */}
-      <canvas
-        ref={particleCanvasRef}
-        className="fixed inset-0 pointer-events-none z-[1] opacity-80"
-      />
-
-      {/* ==========================================
-          2. NAVIGATION BAR
-         ========================================== */}
-      <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled
-            ? 'bg-[#080510]/85 backdrop-blur-xl border-b border-purple-500/25 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.65)]'
-            : 'bg-transparent py-5'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          {/* Brand Logo */}
-          <button
-            onClick={() => scrollToSection('home')}
-            className="flex items-center gap-2.5 group text-left focus:outline-none"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#A020F0] via-[#8B35FF] to-[#FF28B9] p-[1.5px] shadow-[0_0_20px_rgba(255,40,185,0.45)] group-hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-[#080510] rounded-[10px] flex items-center justify-center">
-                <Zap className="w-5 h-5 text-[#FF28B9] fill-[#FF28B9]/20" />
-              </div>
-            </div>
-            <div>
-              <span className="font-display font-extrabold text-xl tracking-wider bg-gradient-to-r from-white via-purple-200 to-[#FF28B9] bg-clip-text text-transparent block leading-none">
-                VIBRANZA
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.28em] text-purple-300/80 font-semibold">
-                FEST • 2026
-              </span>
-            </div>
-          </button>
-
-          {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-7 text-sm font-medium text-purple-100/85">
-            {[
-              { label: 'Home', id: 'home' },
-              { label: 'About', id: 'about' },
-              { label: 'Schedule', id: 'schedule' },
-              { label: 'Performers', id: 'performers' },
-              { label: 'Events', id: 'events' },
-              { label: 'Venue', id: 'venue' },
-              { label: 'Register', id: 'register' }
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => scrollToSection(item.id)}
-                className="relative py-1 hover:text-white transition-colors group"
-              >
-                {item.label}
-                <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-gradient-to-r from-[#A020F0] to-[#FF28B9] transition-all duration-300 group-hover:w-full" />
-              </button>
-            ))}
-          </nav>
-
-          {/* Social Icons + CTA */}
-          <div className="hidden md:flex items-center gap-3">
-            {/* Instagram */}
-            <a
-              href="#footer"
-              onClick={(e) => {
-                e.preventDefault();
-                scrollToSection('footer');
-              }}
-              aria-label="Instagram"
-              className="w-9 h-9 rounded-full bg-white/5 border border-purple-500/30 flex items-center justify-center text-purple-200 hover:text-white hover:border-[#FF28B9] hover:bg-[#FF28B9]/20 transition-all"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-              </svg>
-            </a>
-            {/* YouTube */}
-            <a
-              href="#footer"
-              onClick={(e) => {
-                e.preventDefault();
-                scrollToSection('footer');
-              }}
-              aria-label="YouTube"
-              className="w-9 h-9 rounded-full bg-white/5 border border-purple-500/30 flex items-center justify-center text-purple-200 hover:text-white hover:border-[#FF28B9] hover:bg-[#FF28B9]/20 transition-all"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-              </svg>
-            </a>
-            {/* Spotify */}
-            <a
-              href="#footer"
-              onClick={(e) => {
-                e.preventDefault();
-                scrollToSection('footer');
-              }}
-              aria-label="Spotify"
-              className="w-9 h-9 rounded-full bg-white/5 border border-purple-500/30 flex items-center justify-center text-purple-200 hover:text-white hover:border-[#FF28B9] hover:bg-[#FF28B9]/20 transition-all"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-              </svg>
-            </a>
-
-            <button
-              onClick={() => scrollToSection('register')}
-              className="ml-2 px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-[#A020F0] to-[#FF28B9] hover:from-[#8B35FF] hover:to-[#FF28B9] text-white shadow-[0_0_20px_rgba(255,40,185,0.45)] hover:shadow-[0_0_28px_rgba(255,40,185,0.75)] transition-all"
-            >
-              Get Pass
-            </button>
-          </div>
-
-          {/* Mobile Hamburger */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle Menu"
-            className="lg:hidden p-2.5 rounded-xl bg-white/5 border border-purple-500/30 text-white"
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        </div>
-
-        {/* Mobile Drawer Menu */}
-        {mobileMenuOpen && (
-          <div className="lg:hidden bg-[#0D071A]/95 backdrop-blur-2xl border-b border-purple-500/30 px-6 py-6 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Home', id: 'home' },
-                { label: 'About', id: 'about' },
-                { label: 'Schedule', id: 'schedule' },
-                { label: 'Performers', id: 'performers' },
-                { label: 'Events', id: 'events' },
-                { label: 'Venue', id: 'venue' }
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => scrollToSection(item.id)}
-                  className="text-left py-2.5 px-3 rounded-lg bg-white/5 hover:bg-purple-600/20 text-purple-100 font-medium text-sm"
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => scrollToSection('register')}
-              className="w-full py-3.5 rounded-xl font-bold uppercase tracking-wider text-sm bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-[0_0_24px_rgba(255,40,185,0.5)]"
-            >
-              Register Now
-            </button>
-          </div>
-        )}
-      </header>
-
-      {/* ==========================================
-          3. HERO SECTION (CINEMATIC CONCERT STAGE)
-         ========================================== */}
-      <section
-        id="home"
-        className="relative min-h-screen flex items-center justify-center pt-28 pb-24 px-4 sm:px-6 overflow-hidden"
-      >
-        {/* Full-Screen Concert Stage Photography */}
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?auto=format&fit=crop&w=1920&q=85')`
-          }}
-        />
-        {/* Deep Cinematic Dark & Neon Gradient Overlays */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#080510]/85 via-[#080510]/70 to-[#080510]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(160,32,240,0.38),transparent_65%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_30%,rgba(255,40,185,0.28),transparent_50%)]" />
-
-        {/* Animated Purple & Pink Laser Beams */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-20 left-1/4 w-32 h-[120vh] bg-gradient-to-b from-[#A020F0]/40 via-[#A020F0]/10 to-transparent blur-2xl origin-top animate-laser-left" />
-          <div className="absolute -top-20 right-1/4 w-32 h-[120vh] bg-gradient-to-b from-[#FF28B9]/40 via-[#FF28B9]/10 to-transparent blur-2xl origin-top animate-laser-right" />
-        </div>
-
-        {/* Floating Decorative Music Elements */}
-        <div className="hidden md:flex pointer-events-none absolute top-36 left-12 w-12 h-12 rounded-2xl glass-card items-center justify-center text-[#FF28B9] animate-float">
-          <Music className="w-6 h-6" />
-        </div>
-        <div
-          className="hidden md:flex pointer-events-none absolute bottom-40 right-14 w-14 h-14 rounded-full glass-card items-center justify-center text-[#E0AAFF] animate-float"
-          style={{ animationDelay: '1.5s' }}
-        >
-          <Radio className="w-7 h-7" />
-        </div>
-
-        {/* Hero Main Content */}
-        <div className="relative z-10 max-w-6xl mx-auto text-center">
-          {/* Handwritten Script Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-[#FF28B9]/40 backdrop-blur-md mb-5">
-            <Sparkles className="w-4 h-4 text-[#FF28B9]" />
-            <span className="font-script text-xl sm:text-2xl text-pink-200 tracking-wide">
-              Feel the Beat. Live the Moment. Own the Night.
-            </span>
-          </div>
-
-          {/* Massive Artistic Heading */}
-          <h1 className="font-display font-extrabold text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight leading-[0.95] uppercase">
-            <span className="block bg-gradient-to-r from-white via-[#E0AAFF] to-white bg-clip-text text-transparent neon-text-glow">
-              VIBRANZA
-            </span>
-            <span className="block text-4xl sm:text-6xl md:text-7xl mt-1 bg-gradient-to-r from-[#A020F0] via-[#FF28B9] to-[#8B35FF] bg-clip-text text-transparent">
-              2026
-            </span>
-          </h1>
-
-          {/* Tagline & Supporting Text */}
-          <p className="mt-5 text-lg sm:text-2xl font-extrabold tracking-[0.18em] uppercase text-white/95">
-            FEEL THE BEAT. LIVE THE MOMENT.
-          </p>
-          <p className="font-script text-2xl sm:text-3xl text-[#E0AAFF] mt-1">
-            One Campus. A Thousand Memories.
-          </p>
-
-          {/* Event Date & Location Pill */}
-          <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-4 sm:gap-6 px-6 py-3 rounded-2xl glass-card text-sm sm:text-base font-medium text-purple-100">
-            <span className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-[#FF28B9]" />
-              18–19 December 2026
-            </span>
-            <span className="hidden sm:inline text-purple-500">•</span>
-            <span className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#A020F0]" />
-              College Main Campus
-            </span>
-          </div>
-
-          {/* Live Animated Countdown Timer */}
-          <div className="mt-8 grid grid-cols-4 gap-2.5 sm:gap-4 max-w-lg mx-auto">
-            {[
-              { label: 'Days', value: timeLeft.days },
-              { label: 'Hours', value: timeLeft.hours },
-              { label: 'Minutes', value: timeLeft.minutes },
-              { label: 'Seconds', value: timeLeft.seconds }
-            ].map((unit) => (
-              <div
-                key={unit.label}
-                className="glass-card rounded-2xl py-3.5 px-2 sm:py-4 sm:px-3 border border-purple-400/30 shadow-[0_0_25px_rgba(139,53,255,0.2)]"
-              >
-                <div className="font-display font-extrabold text-2xl sm:text-4xl bg-gradient-to-b from-white to-purple-300 bg-clip-text text-transparent">
-                  {String(unit.value).padStart(2, '0')}
-                </div>
-                <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-pink-300/90 mt-1 font-semibold">
-                  {unit.label}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Primary Hero CTA Buttons */}
-          <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button
-              onClick={() => scrollToSection('register')}
-              className="w-full sm:w-auto px-8 py-4 rounded-full font-display font-bold text-sm sm:text-base uppercase tracking-wider bg-gradient-to-r from-[#A020F0] via-[#8B35FF] to-[#FF28B9] text-white shadow-[0_0_32px_rgba(255,40,185,0.65)] hover:shadow-[0_0_46px_rgba(255,40,185,0.95)] hover:scale-105 transition-all flex items-center justify-center gap-2"
-            >
-              <Ticket className="w-5 h-5" />
-              REGISTER NOW
-            </button>
-            <button
-              onClick={() => scrollToSection('events')}
-              className="w-full sm:w-auto px-8 py-4 rounded-full font-display font-bold text-sm sm:text-base uppercase tracking-wider bg-white/5 hover:bg-white/15 border border-purple-400/40 text-white backdrop-blur-md transition-all flex items-center justify-center gap-2"
-            >
-              Explore the Fest
-              <ChevronRight className="w-5 h-5 text-[#FF28B9]" />
-            </button>
-          </div>
-        </div>
-
-        {/* Torn-Paper SVG Divider Transition */}
-        <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden leading-none pointer-events-none">
-          <svg
-            viewBox="0 0 1440 70"
-            preserveAspectRatio="none"
-            className="w-full h-10 sm:h-14 fill-[#0D071B]"
-          >
-            <path d="M0,32 L60,48 L120,24 L190,52 L260,28 L340,56 L420,22 L500,49 L580,26 L670,55 L760,20 L850,50 L940,25 L1030,54 L1120,22 L1210,48 L1300,26 L1380,45 L1440,30 L1440,70 L0,70 Z" />
-          </svg>
-        </div>
-      </section>
-
-      {/* ==========================================
-          4. ABOUT THE FEST SECTION
-         ========================================== */}
-      <section id="about" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-[#0D071B] z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-3xl mx-auto">
-            <span className="font-script text-2xl sm:text-3xl text-[#FF28B9] block mb-2">
-              Two Days of Pure Adrenaline
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-5xl tracking-tight uppercase bg-gradient-to-r from-white via-purple-200 to-[#E0AAFF] bg-clip-text text-transparent">
-              MORE THAN A FEST. IT&apos;S A VIBE!
-            </h2>
-            <p className="mt-5 text-purple-200/80 text-base sm:text-lg leading-relaxed">
-              Two unforgettable days filled with music, dance, creativity, competitions and
-              celebrations. Bring your talent, meet new people and create memories that last
-              forever.
-            </p>
-          </div>
-
-          {/* 5 Interactive Vibe Cards */}
-          <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
-            {[
-              {
-                title: 'Live Music',
-                desc: 'Electrifying indie bands, acoustic jams, and starlight headliner concerts.',
-                icon: Mic2,
-                gradient: 'from-[#A020F0] to-[#8B35FF]'
-              },
-              {
-                title: 'Dance Battles',
-                desc: 'High-energy street cyphers, classical fusion, and synchronized crew face-offs.',
-                icon: Flame,
-                gradient: 'from-[#FF28B9] to-[#A020F0]'
-              },
-              {
-                title: 'Exciting Competitions',
-                desc: '13+ flagship events with ₹2.5L+ in total prize pools and campus glory.',
-                icon: Award,
-                gradient: 'from-[#8B35FF] to-[#FF28B9]'
-              },
-              {
-                title: 'Creative Arts',
-                desc: 'Live digital illustration, indie short films, shutter walks, and couture fashion.',
-                icon: Palette,
-                gradient: 'from-[#A020F0] to-[#FF28B9]'
-              },
-              {
-                title: 'Fun Activities',
-                desc: 'Campus-wide treasure hunts, RGB gaming arenas, and carnival challenges.',
-                icon: Gamepad2,
-                gradient: 'from-[#FF28B9] to-[#8B35FF]'
-              }
-            ].map((card, idx) => {
-              const IconComponent = card.icon;
-              return (
-                <div
-                  key={idx}
-                  className="glass-card glass-card-hover rounded-3xl p-6 flex flex-col justify-between group"
-                >
-                  <div>
-                    <div
-                      className={`w-13 h-13 w-12 h-12 rounded-2xl bg-gradient-to-br ${card.gradient} flex items-center justify-center text-white shadow-[0_0_20px_rgba(160,32,240,0.45)] group-hover:scale-110 group-hover:rotate-6 transition-transform`}
-                    >
-                      <IconComponent className="w-6 h-6" />
-                    </div>
-                    <h3 className="font-display font-bold text-xl text-white mt-5 group-hover:text-[#FF28B9] transition-colors">
-                      {card.title}
-                    </h3>
-                    <p className="text-sm text-purple-200/75 mt-2.5 leading-relaxed">
-                      {card.desc}
-                    </p>
-                  </div>
-                  <div className="mt-6 pt-4 border-t border-purple-500/20 flex items-center text-xs font-semibold uppercase tracking-wider text-purple-300 group-hover:text-white">
-                    <span>Experience It</span>
-                    <ChevronRight className="w-4 h-4 ml-1 text-[#FF28B9] group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ==========================================
-          5. EVENT SCHEDULE SECTION
-         ========================================== */}
-      <section id="schedule" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-[#080510] z-10">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center">
-            <span className="font-script text-2xl sm:text-3xl text-[#E0AAFF]">
-              Mark Your Calendar
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-5xl uppercase tracking-tight mt-1">
-              FESTIVAL <span className="text-[#FF28B9]">TIMELINE</span>
-            </h2>
-          </div>
-
-          {/* Day Selector Tabs */}
-          <div className="mt-10 flex justify-center">
-            <div className="inline-flex p-1.5 rounded-2xl glass-card border border-purple-500/30">
-              <button
-                onClick={() => setActiveScheduleDay('day1')}
-                className={`px-6 sm:px-8 py-3 rounded-xl font-display font-bold text-sm sm:text-base transition-all ${
-                  activeScheduleDay === 'day1'
-                    ? 'bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-[0_0_24px_rgba(255,40,185,0.5)]'
-                    : 'text-purple-200 hover:text-white'
-                }`}
-              >
-                DAY 1 • 18 DECEMBER
-              </button>
-              <button
-                onClick={() => setActiveScheduleDay('day2')}
-                className={`px-6 sm:px-8 py-3 rounded-xl font-display font-bold text-sm sm:text-base transition-all ${
-                  activeScheduleDay === 'day2'
-                    ? 'bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-[0_0_24px_rgba(255,40,185,0.5)]'
-                    : 'text-purple-200 hover:text-white'
-                }`}
-              >
-                DAY 2 • 19 DECEMBER
-              </button>
-            </div>
-          </div>
-
-          {/* Glowing Vertical Timeline */}
-          <div className="mt-12 relative space-y-6 before:content-[''] before:absolute before:left-5 sm:before:left-1/2 before:top-2 before:bottom-2 before:w-[2px] before:bg-gradient-to-b before:from-[#A020F0] before:via-[#FF28B9] before:to-[#8B35FF]">
-            {SCHEDULE_DATA[activeScheduleDay].map((slot, index) => {
-              const isEven = index % 2 === 0;
-              return (
-                <div
-                  key={slot.title}
-                  className={`relative flex flex-col sm:flex-row items-start sm:items-center ${
-                    isEven ? 'sm:flex-row-reverse' : ''
-                  }`}
-                >
-                  {/* Timeline Neon Node */}
-                  <div className="absolute left-5 sm:left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-[#FF28B9] border-4 border-[#080510] shadow-[0_0_16px_#FF28B9] z-10 mt-6 sm:mt-0" />
-
-                  {/* Spacer for alternating desktop layout */}
-                  <div className="hidden sm:block sm:w-1/2" />
-
-                  {/* Timeline Card */}
-                  <div
-                    className={`w-full pl-12 sm:pl-0 sm:w-1/2 ${
-                      isEven ? 'sm:pr-10' : 'sm:pl-10'
-                    }`}
-                  >
-                    <div
-                      className={`glass-card glass-card-hover rounded-2xl p-5 sm:p-6 ${
-                        slot.highlight
-                          ? 'border-[#FF28B9]/60 shadow-[0_0_25px_rgba(255,40,185,0.18)]'
-                          : ''
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-[#A020F0]/25 text-[#E0AAFF] border border-[#A020F0]/40">
-                          <Clock className="w-3.5 h-3.5 text-[#FF28B9]" />
-                          {slot.time}
-                        </span>
-                        <span className="text-xs font-semibold uppercase tracking-wider text-[#FF28B9]">
-                          {slot.tag}
-                        </span>
-                      </div>
-                      <h3 className="font-display font-bold text-lg sm:text-xl text-white">
-                        {slot.title}
-                      </h3>
-                      <p className="text-sm text-purple-200/75 mt-1.5 leading-relaxed">
-                        {slot.desc}
-                      </p>
-                      <div className="mt-3 flex items-center gap-1.5 text-xs text-purple-300/90">
-                        <MapPin className="w-3.5 h-3.5 text-[#A020F0]" />
-                        {slot.venue}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ==========================================
-          6. PERFORMERS & SPECIAL GUESTS
-         ========================================== */}
-      <section
-        id="performers"
-        className="relative py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#080510] via-[#110822] to-[#080510] z-10"
-      >
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-12">
-            <div>
-              <span className="font-script text-2xl sm:text-3xl text-[#FF28B9]">
-                Headliners & Stage Takeovers
-              </span>
-              <h2 className="font-display font-extrabold text-3xl sm:text-5xl uppercase tracking-tight mt-1">
-                PERFORMERS &amp; <span className="text-[#A020F0]">GUESTS</span>
-              </h2>
-            </div>
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-400/30 text-amber-200 text-xs sm:text-sm">
-              <Info className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Sample lineup displayed as placeholders until official artists are confirmed.</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {PERFORMERS_DATA.map((artist) => (
-              <div
-                key={artist.id}
-                className="group relative rounded-3xl overflow-hidden glass-card border border-purple-500/30 hover:border-[#FF28B9] transition-all duration-500 shadow-[0_12px_35px_rgba(0,0,0,0.6)]"
-              >
-                {/* Artist Image with Zoom on Hover */}
-                <div className="relative h-80 sm:h-96 overflow-hidden">
-                  <img
-                    src={artist.image}
-                    alt={artist.name}
-                    className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${
-                      artist.isMystery ? 'brightness-50 blur-[2px] group-hover:blur-0' : ''
-                    }`}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#080510] via-[#080510]/40 to-transparent" />
-
-                  {/* Placeholder Badge */}
-                  <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between gap-2">
-                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#080510]/80 backdrop-blur-md border border-purple-400/40 text-purple-200">
-                      {artist.status}
-                    </span>
-                  </div>
-
-                  {/* Mystery Question Icon */}
-                  {artist.isMystery && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-20 h-20 rounded-full bg-[#FF28B9]/20 border-2 border-[#FF28B9] flex items-center justify-center backdrop-blur-md animate-pulse">
-                        <span className="font-display font-black text-4xl text-white">?</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bottom Artist Info */}
-                  <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <span className="inline-block text-xs font-bold uppercase tracking-widest text-[#FF28B9] mb-1">
-                      {artist.day}
-                    </span>
-                    <h3 className="font-display font-extrabold text-2xl text-white group-hover:text-[#E0AAFF] transition-colors">
-                      {artist.name}
-                    </h3>
-                    <p className="text-sm text-purple-200/80 mt-0.5">{artist.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ==========================================
-          7. EVENTS & COMPETITIONS (13 INTERACTIVE CARDS)
-         ========================================== */}
-      <section id="events" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-[#080510] z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-3xl mx-auto">
-            <span className="font-script text-2xl sm:text-3xl text-[#FF28B9]">
-              Step Into The Arena
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-5xl uppercase tracking-tight mt-1">
-              EVENTS &amp; <span className="text-[#8B35FF]">COMPETITIONS</span>
-            </h2>
-            <p className="mt-3 text-purple-200/75 text-sm sm:text-base">
-              Choose your battlefield across Cultural, Creative, and Fun arenas. Click any event for
-              official rules or jump straight to registration.
-            </p>
-          </div>
-
-          {/* Category Filter Tabs */}
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-2.5 sm:gap-3">
-            {['All', 'Cultural', 'Creative', 'Fun'].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-6 py-2.5 rounded-full text-xs sm:text-sm font-bold uppercase tracking-wider transition-all ${
-                  selectedCategory === cat
-                    ? 'bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-[0_0_22px_rgba(255,40,185,0.5)]'
-                    : 'glass-card text-purple-200 hover:text-white hover:border-purple-400/50'
-                }`}
-              >
-                {cat === 'All' ? `All Events (${EVENTS_DATA.length})` : cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Event Cards Grid */}
-          <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredEvents.map((ev) => (
-              <div
-                key={ev.id}
-                className="glass-card glass-card-hover rounded-3xl overflow-hidden flex flex-col justify-between group"
-              >
-                <div>
-                  {/* Event Thumbnail */}
-                  <div className="relative h-48 overflow-hidden">
-                    <img
-                      src={ev.image}
-                      alt={ev.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#140C26] via-transparent to-black/40" />
-
-                    {/* Category Pill */}
-                    <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#080510]/80 backdrop-blur-md text-[#E0AAFF] border border-purple-400/30">
-                      {ev.category}
-                    </span>
-
-                    {/* Participation Badge */}
-                    <span className="absolute top-3 right-3 px-3 py-1 rounded-full text-[11px] font-bold bg-[#FF28B9]/90 text-white shadow-md">
-                      {ev.type}
-                    </span>
-                  </div>
-
-                  {/* Card Body */}
-                  <div className="p-5">
-                    <div className="flex items-center justify-between text-xs text-purple-300 mb-1.5">
-                      <span>{ev.timing}</span>
-                      <span className="font-bold text-[#FF28B9]">Prize: {ev.prize}</span>
-                    </div>
-                    <h3 className="font-display font-bold text-xl text-white group-hover:text-[#FF28B9] transition-colors">
-                      {ev.title}
-                    </h3>
-                    <p className="text-sm text-purple-200/75 mt-2 line-clamp-2 leading-relaxed">
-                      {ev.shortDesc}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Card Action Buttons */}
-                <div className="px-5 pb-5 pt-2 flex items-center gap-2.5">
-                  <button
-                    onClick={() => setSelectedEventModal(ev)}
-                    className="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-white/5 hover:bg-white/15 border border-purple-400/30 text-purple-100 transition-colors"
-                  >
-                    View Details
-                  </button>
-                  <button
-                    onClick={() => handleSelectEventForRegistration(ev.title)}
-                    className="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-[0_0_16px_rgba(160,32,240,0.4)] hover:shadow-[0_0_24px_rgba(255,40,185,0.65)] transition-all"
-                  >
-                    Register
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ==========================================
-          8. VENUE SECTION
-         ========================================== */}
-      <section
-        id="venue"
-        className="relative py-24 px-4 sm:px-6 lg:px-8 bg-[#0D071B] border-y border-purple-500/20 z-10"
-      >
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            {/* Left Venue Details */}
-            <div className="lg:col-span-5 space-y-6">
-              <div>
-                <span className="font-script text-2xl sm:text-3xl text-[#FF28B9]">
-                  Festival Grounds
-                </span>
-                <h2 className="font-display font-extrabold text-3xl sm:text-5xl uppercase tracking-tight mt-1 leading-tight">
-                  FIND YOUR WAY TO THE <span className="text-[#A020F0]">VIBE.</span>
-                </h2>
-              </div>
-
-              <div className="glass-card rounded-3xl p-6 space-y-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-[#A020F0]/20 border border-[#A020F0]/40 flex items-center justify-center shrink-0 mt-0.5">
-                    <MapPin className="w-5 h-5 text-[#FF28B9]" />
-                  </div>
-                  <div>
-                    <h3 className="font-display font-bold text-lg text-white">
-                      College Main Campus
-                    </h3>
-                    <p className="text-sm text-purple-200/80">
-                      College Auditorium &amp; Open Ground
-                    </p>
-                    <span className="inline-block mt-1.5 text-[11px] px-2.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-400/20">
-                      Placeholder Campus Venue • Official Gate Map Sent Upon Registration
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-[#A020F0]/20 border border-[#A020F0]/40 flex items-center justify-center shrink-0 mt-0.5">
-                    <Calendar className="w-5 h-5 text-[#E0AAFF]" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-white text-sm">18–19 December 2026</h4>
-                    <p className="text-xs text-purple-200/75">
-                      Gates Open at 08:30 AM • Pro-Shows till 10:00 PM
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-[#A020F0]/20 border border-[#A020F0]/40 flex items-center justify-center shrink-0 mt-0.5">
-                    <Phone className="w-5 h-5 text-[#FF28B9]" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-white text-sm">Hospitality &amp; Helpdesk</h4>
-                    <p className="text-xs text-purple-200/75">
-                      +91 98765 43210 • helpdesk@vibranza2026.edu
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <a
-                    href="https://maps.google.com/?q=College+Main+Campus+Auditorium"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full py-3.5 px-6 rounded-xl font-display font-bold text-xs uppercase tracking-wider bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-[0_0_24px_rgba(160,32,240,0.45)] hover:shadow-[0_0_32px_rgba(255,40,185,0.75)] transition-all flex items-center justify-center gap-2"
-                  >
-                    Get Directions
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Interactive Campus Visual + Stylized Map */}
-            <div className="lg:col-span-7 space-y-5">
-              <div className="relative rounded-3xl overflow-hidden glass-card border border-purple-500/30 h-64 sm:h-72 group">
-                <img
-                  src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80"
-                  alt="College Main Campus Arena"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#080510] via-[#080510]/30 to-transparent" />
-                <div className="absolute bottom-5 left-6 right-6 flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <span className="text-xs uppercase tracking-widest text-[#FF28B9] font-bold">
-                      Main Festival Zone
-                    </span>
-                    <h3 className="font-display font-bold text-xl sm:text-2xl text-white">
-                      College Auditorium &amp; Open Ground
-                    </h3>
-                  </div>
-                  <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-[#080510]/80 border border-purple-400/40 text-purple-200">
-                    3 Stages • Food Village • Gaming Arena
-                  </span>
-                </div>
-              </div>
-
-              {/* Interactive Stylized Campus Zone Map */}
-              <div className="glass-card rounded-3xl p-5 border border-purple-500/30">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-purple-300 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#FF28B9] animate-ping" />
-                    Interactive Campus Zone Radar
-                  </span>
-                  <span className="text-[11px] text-purple-400">Tap pins to inspect zones</span>
-                </div>
-                <div className="relative h-48 rounded-2xl bg-[#080510] border border-purple-500/25 overflow-hidden p-4 grid grid-cols-3 gap-3">
-                  {/* Decorative Grid Lines */}
-                  <div
-                    className="absolute inset-0 opacity-20 pointer-events-none"
-                    style={{
-                      backgroundImage:
-                        'linear-gradient(to right, #A020F0 1px, transparent 1px), linear-gradient(to bottom, #A020F0 1px, transparent 1px)',
-                      backgroundSize: '32px 32px'
-                    }}
-                  />
-                  {[
-                    {
-                      zone: 'Zone A',
-                      name: 'Main Concert Stage',
-                      sub: 'Open Ground • DJ & Pro-Shows',
-                      color: 'border-[#FF28B9] bg-[#FF28B9]/15'
-                    },
-                    {
-                      zone: 'Zone B',
-                      name: 'Grand Auditorium',
-                      sub: 'Singing, Drama & Short Films',
-                      color: 'border-[#A020F0] bg-[#A020F0]/15'
-                    },
-                    {
-                      zone: 'Zone C',
-                      name: 'Neon Carnival Plaza',
-                      sub: 'Gaming LAN, Food & Registration',
-                      color: 'border-[#8B35FF] bg-[#8B35FF]/15'
-                    }
-                  ].map((z) => (
-                    <div
-                      key={z.zone}
-                      className={`relative z-10 rounded-xl border ${z.color} p-3 flex flex-col justify-between hover:scale-[1.03] transition-transform`}
-                    >
-                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#FF28B9]">
-                        {z.zone}
-                      </span>
-                      <div>
-                        <div className="font-display font-bold text-xs sm:text-sm text-white leading-snug">
-                          {z.name}
-                        </div>
-                        <div className="text-[11px] text-purple-200/75 mt-0.5">{z.sub}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ==========================================
-          9. REGISTRATION SECTION & FIREBASE BACKEND
-         ========================================== */}
-      <section id="register" className="relative py-24 px-4 sm:px-6 lg:px-8 bg-[#080510] z-10">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center">
-            <span className="font-script text-2xl sm:text-3xl text-[#FF28B9]">
-              Claim Your All-Access Festival Pass
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-5xl uppercase tracking-tight mt-1">
-              JOIN THE <span className="text-[#FF28B9]">CELEBRATION!</span>
-            </h2>
-            <p className="mt-3 text-purple-200/80 text-sm sm:text-base">
-              Register online to generate your instant VIP Digital Festival Pass synced directly to
-              our cloud database.
-            </p>
-
-            {/* Live Cloud Registration Counter Pill */}
-            <div className="mt-5 inline-flex items-center gap-2.5 px-4 py-2 rounded-full glass-card border border-[#FF28B9]/40 text-xs sm:text-sm text-purple-100">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>
-                Live Cloud Database Connected •{' '}
-                <strong className="text-[#FF28B9]">{registrations.length}</strong> Passes Issued
-              </span>
-            </div>
-          </div>
-
-          {/* Switch Between New Registration & Pass Lookup */}
-          <div className="mt-8 flex justify-center gap-3">
-            <button
-              onClick={() => setActiveRegTab('register')}
-              className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all ${
-                activeRegTab === 'register'
-                  ? 'bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-lg'
-                  : 'glass-card text-purple-200 hover:text-white'
-              }`}
-            >
-              New Registration
-            </button>
-            <button
-              onClick={() => setActiveRegTab('lookup')}
-              className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${
-                activeRegTab === 'lookup'
-                  ? 'bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-lg'
-                  : 'glass-card text-purple-200 hover:text-white'
-              }`}
-            >
-              <Search className="w-4 h-4" />
-              Find My Pass
-            </button>
-          </div>
-
-          {dbError && (
-            <div className="mt-6 p-4 rounded-2xl bg-red-500/15 border border-red-400/40 text-red-200 text-sm flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 shrink-0 text-red-400" />
-              <span>{dbError}</span>
-            </div>
-          )}
-
-          {/* TAB 1: REGISTRATION FORM OR CONFIRMATION PASS */}
-          {activeRegTab === 'register' && (
-            <div className="mt-8">
-              {confirmedPass ? (
-                /* CELEBRATORY VIP FESTIVAL PASS CONFIRMATION */
-                <div className="glass-card rounded-3xl p-6 sm:p-10 border-2 border-[#FF28B9]/70 shadow-[0_0_50px_rgba(255,40,185,0.28)] text-center">
-                  <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center mx-auto text-emerald-300">
-                    <CheckCircle2 className="w-9 h-9" />
-                  </div>
-                  <h3 className="font-display font-extrabold text-2xl sm:text-4xl text-white mt-4">
-                    YOU&apos;RE ON THE LIST!
-                  </h3>
-                  <p className="text-purple-200/80 text-sm sm:text-base mt-1">
-                    Your registration has been saved securely to the VIBRANZA 2026 cloud database.
-                  </p>
-
-                  {/* Digital Pass Preview Card */}
-                  <div className="mt-8 max-w-xl mx-auto rounded-2xl bg-gradient-to-br from-[#1A0B36] via-[#120724] to-[#2B0A3D] border border-[#FF28B9]/60 p-6 text-left relative overflow-hidden shadow-2xl">
-                    <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-dashed border-purple-400/30">
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#FF28B9]">
-                          VIBRANZA 2026 • OFFICIAL PASS
-                        </span>
-                        <h4 className="font-display font-extrabold text-xl text-white mt-0.5">
-                          {confirmedPass.fullName}
-                        </h4>
-                      </div>
-                      <div className="px-3.5 py-1.5 rounded-xl bg-[#080510]/80 border border-[#FF28B9]/50 font-mono font-bold text-sm text-[#FF28B9]">
-                        {confirmedPass.registrationId}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 pt-4 text-sm">
-                      <div>
-                        <span className="text-[11px] uppercase tracking-wider text-purple-300/70 block">
-                          Event
-                        </span>
-                        <span className="font-bold text-white">{confirmedPass.event}</span>
-                      </div>
-                      <div>
-                        <span className="text-[11px] uppercase tracking-wider text-purple-300/70 block">
-                          Participation
-                        </span>
-                        <span className="font-bold text-pink-300">
-                          {confirmedPass.participationType}
-                          {confirmedPass.participationType === 'Team'
-                            ? ` (${confirmedPass.teamName})`
-                            : ''}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[11px] uppercase tracking-wider text-purple-300/70 block">
-                          Institution
-                        </span>
-                        <span className="text-purple-100">{confirmedPass.college}</span>
-                      </div>
-                      <div>
-                        <span className="text-[11px] uppercase tracking-wider text-purple-300/70 block">
-                          Dept &amp; Year
-                        </span>
-                        <span className="text-purple-100">
-                          {confirmedPass.department} • {confirmedPass.year}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Download & Register Another Actions */}
-                  <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <button
-                      onClick={() => downloadFestivalPass(confirmedPass)}
-                      className="w-full sm:w-auto px-7 py-3.5 rounded-full font-display font-bold text-xs sm:text-sm uppercase tracking-wider bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-[0_0_26px_rgba(255,40,185,0.55)] hover:scale-105 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download Festival Pass (PNG)
-                    </button>
-                    <button
-                      onClick={() => {
-                        setConfirmedPass(null);
-                        setFormData((prev) => ({ ...prev, event: '' }));
-                      }}
-                      className="w-full sm:w-auto px-6 py-3.5 rounded-full font-bold text-xs sm:text-sm uppercase tracking-wider bg-white/5 hover:bg-white/15 border border-purple-400/30 text-purple-100 transition-colors"
-                    >
-                      Register For Another Event
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* GLASSMORPHISM REGISTRATION FORM */
-                <form
-                  onSubmit={handleRegistrationSubmit}
-                  noValidate
-                  className="glass-card rounded-3xl p-6 sm:p-10 border border-purple-500/35 shadow-[0_20px_60px_rgba(0,0,0,0.65)] space-y-6"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {/* Full Name */}
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-2">
-                        Full Name *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Aarav Sharma"
-                        value={formData.fullName}
-                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl bg-[#080510]/80 border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white placeholder-purple-400/40 text-sm"
-                      />
-                      {formErrors.fullName && (
-                        <p className="text-xs text-[#FF28B9] mt-1">{formErrors.fullName}</p>
-                      )}
-                    </div>
-
-                    {/* Email Address */}
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-2">
-                        Email Address *
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="aarav@college.edu"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl bg-[#080510]/80 border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white placeholder-purple-400/40 text-sm"
-                      />
-                      {formErrors.email && (
-                        <p className="text-xs text-[#FF28B9] mt-1">{formErrors.email}</p>
-                      )}
-                    </div>
-
-                    {/* Phone Number */}
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-2">
-                        Phone Number (10 Digits) *
-                      </label>
-                      <input
-                        type="tel"
-                        maxLength={10}
-                        placeholder="9876543210"
-                        value={formData.phone}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            phone: e.target.value.replace(/\D/g, '')
-                          })
-                        }
-                        className="w-full px-4 py-3 rounded-xl bg-[#080510]/80 border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white placeholder-purple-400/40 text-sm"
-                      />
-                      {formErrors.phone && (
-                        <p className="text-xs text-[#FF28B9] mt-1">{formErrors.phone}</p>
-                      )}
-                    </div>
-
-                    {/* College Name */}
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-2">
-                        College Name *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Institute of Technology & Arts"
-                        value={formData.college}
-                        onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl bg-[#080510]/80 border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white placeholder-purple-400/40 text-sm"
-                      />
-                      {formErrors.college && (
-                        <p className="text-xs text-[#FF28B9] mt-1">{formErrors.college}</p>
-                      )}
-                    </div>
-
-                    {/* Department */}
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-2">
-                        Department *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Computer Science / Design"
-                        value={formData.department}
-                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl bg-[#080510]/80 border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white placeholder-purple-400/40 text-sm"
-                      />
-                      {formErrors.department && (
-                        <p className="text-xs text-[#FF28B9] mt-1">{formErrors.department}</p>
-                      )}
-                    </div>
-
-                    {/* Year of Study */}
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-2">
-                        Year of Study *
-                      </label>
-                      <select
-                        value={formData.year}
-                        onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl bg-[#080510] border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white text-sm"
-                      >
-                        <option value="">Select Year</option>
-                        <option value="1st Year">1st Year</option>
-                        <option value="2nd Year">2nd Year</option>
-                        <option value="3rd Year">3rd Year</option>
-                        <option value="4th Year">4th Year</option>
-                        <option value="Postgraduate (PG)">Postgraduate (PG)</option>
-                      </select>
-                      {formErrors.year && (
-                        <p className="text-xs text-[#FF28B9] mt-1">{formErrors.year}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Select Event Dropdown */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-2">
-                      Select Event / Festival Pass *
-                    </label>
-                    <select
-                      value={formData.event}
-                      onChange={(e) => setFormData({ ...formData, event: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-[#080510] border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white text-sm"
-                    >
-                      <option value="">-- Choose an Event or General Concert Pass --</option>
-                      <option value="General Festival & Concert Pass">
-                        General Festival &amp; Concert Pass (All Shows)
-                      </option>
-                      <optgroup label="Cultural Events">
-                        {EVENTS_DATA.filter((e) => e.category === 'Cultural').map((e) => (
-                          <option key={e.id} value={e.title}>
-                            {e.title} ({e.type})
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Creative Events">
-                        {EVENTS_DATA.filter((e) => e.category === 'Creative').map((e) => (
-                          <option key={e.id} value={e.title}>
-                            {e.title} ({e.type})
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Fun & Gaming">
-                        {EVENTS_DATA.filter((e) => e.category === 'Fun').map((e) => (
-                          <option key={e.id} value={e.title}>
-                            {e.title} ({e.type})
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
-                    {formErrors.event && (
-                      <p className="text-xs text-[#FF28B9] mt-1">{formErrors.event}</p>
-                    )}
-                  </div>
-
-                  {/* Individual vs Team Participation Toggle */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-2">
-                      Participation Type *
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {['Individual', 'Team'].map((type) => (
-                        <button
-                          type="button"
-                          key={type}
-                          onClick={() => setFormData({ ...formData, participationType: type })}
-                          className={`py-3 px-4 rounded-xl text-sm font-bold border transition-all flex items-center justify-center gap-2 ${
-                            formData.participationType === type
-                              ? 'bg-gradient-to-r from-[#A020F0]/30 to-[#FF28B9]/30 border-[#FF28B9] text-white shadow-[0_0_16px_rgba(255,40,185,0.25)]'
-                              : 'bg-[#080510]/60 border-purple-500/25 text-purple-300 hover:text-white'
-                          }`}
-                        >
-                          {type === 'Individual' ? (
-                            <Star className="w-4 h-4 text-[#FF28B9]" />
-                          ) : (
-                            <Users className="w-4 h-4 text-[#A020F0]" />
-                          )}
-                          {type} Participation
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Conditional Team Details */}
-                  {formData.participationType === 'Team' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-purple-950/30 border border-purple-500/30">
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-1.5">
-                          Team / Crew Name *
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Neon Phantoms"
-                          value={formData.teamName}
-                          onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
-                          className="w-full px-4 py-2.5 rounded-xl bg-[#080510] border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white text-sm"
-                        />
-                        {formErrors.teamName && (
-                          <p className="text-xs text-[#FF28B9] mt-1">{formErrors.teamName}</p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-purple-200 mb-1.5">
-                          Team Size
-                        </label>
-                        <select
-                          value={formData.teamSize}
-                          onChange={(e) => setFormData({ ...formData, teamSize: e.target.value })}
-                          className="w-full px-4 py-2.5 rounded-xl bg-[#080510] border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white text-sm"
-                        >
-                          {Array.from({ length: 15 }, (_, i) => i + 2).map((num) => (
-                            <option key={num} value={String(num)}>
-                              {num} Members
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {formErrors.submit && (
-                    <p className="text-sm text-red-400 text-center">{formErrors.submit}</p>
-                  )}
-
-                  {/* Submit Button */}
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full py-4 rounded-2xl font-display font-extrabold text-sm sm:text-base uppercase tracking-wider bg-gradient-to-r from-[#A020F0] via-[#8B35FF] to-[#FF28B9] text-white shadow-[0_0_30px_rgba(255,40,185,0.5)] hover:shadow-[0_0_45px_rgba(255,40,185,0.85)] disabled:opacity-60 transition-all"
-                  >
-                    {submitting ? 'Generating Your VIP Pass...' : 'Complete Registration & Get Pass'}
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-
-          {/* TAB 2: FIND MY PASS (LIVE CLOUD LOOKUP) */}
-          {activeRegTab === 'lookup' && (
-            <div className="mt-8 glass-card rounded-3xl p-6 sm:p-10 border border-purple-500/35">
-              <form onSubmit={handleLookupPass} className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  placeholder="Enter Registration ID (e.g. VIB26-XXXXXX), Email, or Phone"
-                  value={lookupQuery}
-                  onChange={(e) => setLookupQuery(e.target.value)}
-                  className="flex-1 px-4 py-3.5 rounded-xl bg-[#080510] border border-purple-500/30 focus:border-[#FF28B9] focus:outline-none text-white text-sm"
-                />
-                <button
-                  type="submit"
-                  className="px-7 py-3.5 rounded-xl font-display font-bold text-xs sm:text-sm uppercase tracking-wider bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-lg"
-                >
-                  Retrieve Pass
-                </button>
-              </form>
-
-              {lookupSearched && (
-                <div className="mt-6">
-                  {lookupResult ? (
-                    <div className="p-6 rounded-2xl bg-[#130926] border border-[#FF28B9]/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div>
-                        <span className="font-mono text-xs font-bold text-[#FF28B9]">
-                          {lookupResult.registrationId}
-                        </span>
-                        <h4 className="font-display font-bold text-xl text-white">
-                          {lookupResult.fullName}
-                        </h4>
-                        <p className="text-sm text-purple-200/80">
-                          {lookupResult.event} • {lookupResult.college}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => downloadFestivalPass(lookupResult)}
-                        className="px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white flex items-center gap-2"
-                      >
-                        <Download className="w-4 h-4" />
-                        Download PNG
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-center text-sm text-purple-300/80 py-4">
-                      No pass matched that ID, email, or phone number. Double-check your entry or
-                      register now!
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ==========================================
-          10. FAQ & SUPPORT SECTION
-         ========================================== */}
-      <section
-        id="faq"
-        className="relative py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#080510] to-[#0D071B] z-10"
-      >
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="font-script text-2xl sm:text-3xl text-[#E0AAFF]">
-              Got Questions?
-            </span>
-            <h2 className="font-display font-extrabold text-3xl sm:text-5xl uppercase tracking-tight mt-1">
-              FREQUENTLY ASKED <span className="text-[#FF28B9]">QUESTIONS</span>
-            </h2>
-          </div>
-
-          <div className="space-y-3.5">
-            {FAQ_DATA.map((item, index) => {
-              const isOpen = openFaqIndex === index;
-              return (
-                <div
-                  key={index}
-                  className="glass-card rounded-2xl border border-purple-500/25 overflow-hidden"
-                >
-                  <button
-                    onClick={() => setOpenFaqIndex(isOpen ? -1 : index)}
-                    className="w-full px-6 py-4 text-left flex items-center justify-between gap-4 hover:bg-white/5 transition-colors"
-                  >
-                    <span className="font-display font-bold text-base sm:text-lg text-white flex items-center gap-3">
-                      <HelpCircle className="w-5 h-5 text-[#FF28B9] shrink-0" />
-                      {item.q}
-                    </span>
-                    <ChevronDown
-                      className={`w-5 h-5 text-purple-300 transition-transform duration-300 shrink-0 ${
-                        isOpen ? 'rotate-180 text-[#FF28B9]' : ''
-                      }`}
-                    />
-                  </button>
-                  {isOpen && (
-                    <div className="px-6 pb-5 pt-1 text-sm sm:text-base text-purple-200/80 leading-relaxed border-t border-purple-500/15">
-                      {item.a}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Contact & Support Strip */}
-          <div
-            id="contact"
-            className="mt-12 glass-card rounded-3xl p-6 sm:p-8 border border-[#A020F0]/40 flex flex-col md:flex-row items-center justify-between gap-6"
-          >
-            <div>
-              <h3 className="font-display font-bold text-xl sm:text-2xl text-white">
-                Need Direct Festival Support?
-              </h3>
-              <p className="text-sm text-purple-200/75 mt-1">
-                Our student organizing committee is available daily from 9:00 AM to 8:00 PM.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <a
-                href="mailto:support@vibranza2026.edu"
-                className="px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-purple-400/30 text-sm font-medium text-white flex items-center gap-2"
-              >
-                <Mail className="w-4 h-4 text-[#FF28B9]" />
-                support@vibranza2026.edu
-              </a>
-              <a
-                href="tel:+919876543210"
-                className="px-5 py-3 rounded-xl bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-sm font-bold text-white flex items-center gap-2 shadow-lg"
-              >
-                <Phone className="w-4 h-4" />
-                +91 98765 43210
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ==========================================
-          11. FOOTER
-         ========================================== */}
-      <footer
-        id="footer"
-        className="relative bg-[#05030A] border-t border-purple-500/25 pt-16 pb-12 px-4 sm:px-6 lg:px-8 z-10"
-      >
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8 pb-10 border-b border-purple-500/20">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <Zap className="w-6 h-6 text-[#FF28B9]" />
-                <span className="font-display font-extrabold text-2xl sm:text-3xl tracking-wider bg-gradient-to-r from-white via-purple-200 to-[#FF28B9] bg-clip-text text-transparent">
-                  VIBRANZA 2026
-                </span>
-              </div>
-              <p className="font-script text-2xl text-purple-300 mt-1">
-                One Campus. A Thousand Memories.
-              </p>
-            </div>
-
-            {/* Social Links */}
-            <div className="flex items-center gap-3">
-              {[
-                { name: 'Instagram', href: 'https://instagram.com' },
-                { name: 'YouTube', href: 'https://youtube.com' },
-                { name: 'Spotify', href: 'https://spotify.com' }
-              ].map((social) => (
-                <a
-                  key={social.name}
-                  href={social.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 rounded-full glass-card text-xs font-bold uppercase tracking-wider text-purple-200 hover:text-white hover:border-[#FF28B9] transition-all"
-                >
-                  {social.name}
-                </a>
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs sm:text-sm text-purple-300/70">
-            <p>Copyright © 2026 VIBRANZA. All Rights Reserved.</p>
-            <div className="flex flex-wrap items-center gap-6">
-              <button
-                onClick={() => scrollToSection('contact')}
-                className="hover:text-white transition-colors"
-              >
-                Contact
-              </button>
-              <button
-                onClick={() => scrollToSection('faq')}
-                className="hover:text-white transition-colors"
-              >
-                FAQ
-              </button>
-              <button
-                onClick={() => setLegalModal('terms')}
-                className="hover:text-white transition-colors"
-              >
-                Terms &amp; Conditions
-              </button>
-              <button
-                onClick={() => setLegalModal('privacy')}
-                className="hover:text-white transition-colors"
-              >
-                Privacy Policy
-              </button>
-            </div>
-          </div>
-        </div>
-      </footer>
-
-      {/* ==========================================
-          FLOATING AMBIENT AUDIO & BACK-TO-TOP CONTROLS
-         ========================================== */}
-      <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2.5">
-        {/* Background Festival Synth Audio Control (Muted by Default) */}
-        <button
-          onClick={toggleAmbientAudio}
-          title={isPlayingAudio ? 'Mute Festival Synth' : 'Play Festival Synth Vibe'}
-          className={`px-4 py-3 rounded-full glass-card border flex items-center gap-2 text-xs font-bold uppercase tracking-wider shadow-xl transition-all ${
-            isPlayingAudio
-              ? 'border-[#FF28B9] text-white shadow-[0_0_20px_rgba(255,40,185,0.5)]'
-              : 'border-purple-500/40 text-purple-200 hover:text-white'
-          }`}
-        >
-          {isPlayingAudio ? (
-            <>
-              <Volume2 className="w-4 h-4 text-[#FF28B9] animate-pulse" />
-              <span className="hidden sm:inline">Vibe On</span>
-            </>
-          ) : (
-            <>
-              <VolumeX className="w-4 h-4 text-purple-300" />
-              <span className="hidden sm:inline">Sound Off</span>
-            </>
-          )}
-        </button>
-
-        {/* Back to Top Button */}
-        {showBackToTop && (
-          <button
-            onClick={() => scrollToSection('home')}
-            aria-label="Back to top"
-            className="w-11 h-11 rounded-full bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white flex items-center justify-center shadow-[0_0_20px_rgba(255,40,185,0.6)] hover:scale-110 transition-transform"
-          >
-            <ArrowUp className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-
-      {/* ==========================================
-          EVENT DETAILS MODAL
-         ========================================== */}
-      {selectedEventModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
-          onClick={() => setSelectedEventModal(null)}
-        >
-          <div
-            className="glass-card rounded-3xl max-w-xl w-full overflow-hidden border border-[#FF28B9]/50 shadow-[0_0_50px_rgba(160,32,240,0.45)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative h-56">
-              <img
-                src={selectedEventModal.image}
-                alt={selectedEventModal.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#140C26] via-[#140C26]/40 to-transparent" />
-              <button
-                onClick={() => setSelectedEventModal(null)}
-                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-[#FF28B9] transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <div className="absolute bottom-4 left-6">
-                <span className="px-3 py-1 rounded-full text-xs font-bold uppercase bg-[#FF28B9] text-white">
-                  {selectedEventModal.category} • {selectedEventModal.type}
-                </span>
-                <h3 className="font-display font-extrabold text-2xl sm:text-3xl text-white mt-2">
-                  {selectedEventModal.title}
-                </h3>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-5">
-              <div className="flex flex-wrap gap-3 text-xs font-semibold">
-                <span className="px-3 py-1.5 rounded-lg bg-white/5 text-purple-200 border border-purple-400/20">
-                  Schedule: {selectedEventModal.timing}
-                </span>
-                <span className="px-3 py-1.5 rounded-lg bg-[#FF28B9]/15 text-[#FF28B9] border border-[#FF28B9]/30">
-                  Prize Pool: {selectedEventModal.prize}
-                </span>
-              </div>
-
-              <p className="text-sm text-purple-100/85 leading-relaxed">
-                {selectedEventModal.fullDesc}
-              </p>
-
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300 mb-2">
-                  Key Guidelines &amp; Rules
-                </h4>
-                <ul className="space-y-1.5 text-sm text-purple-200/80">
-                  {selectedEventModal.rules.map((rule, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-[#FF28B9] shrink-0 mt-0.5" />
-                      <span>{rule}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <button
-                  onClick={() => handleSelectEventForRegistration(selectedEventModal.title)}
-                  className="flex-1 py-3.5 rounded-xl font-display font-bold text-xs sm:text-sm uppercase tracking-wider bg-gradient-to-r from-[#A020F0] to-[#FF28B9] text-white shadow-lg"
-                >
-                  Register For {selectedEventModal.title}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==========================================
-          LEGAL MODAL (TERMS & PRIVACY)
-         ========================================== */}
-      {legalModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
-          onClick={() => setLegalModal(null)}
-        >
-          <div
-            className="glass-card rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-purple-400/40"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display font-bold text-xl text-white flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-[#FF28B9]" />
-                {legalModal === 'terms' ? 'Terms & Conditions' : 'Privacy Policy'}
-              </h3>
-              <button
-                onClick={() => setLegalModal(null)}
-                className="p-1.5 rounded-lg bg-white/5 text-purple-200 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="text-sm text-purple-200/80 space-y-3 leading-relaxed">
-              {legalModal === 'terms' ? (
-                <>
-                  <p>
-                    1. Entry to VIBRANZA 2026 requires a valid Digital Festival Pass along with an
-                    original college/university photo ID card.
-                  </p>
-                  <p>
-                    2. Event schedules, prize pools, and guest lineups are subject to final
-                    organizing committee confirmation.
-                  </p>
-                  <p>
-                    3. Strict zero-tolerance policy applies toward prohibited substances, campus
-                    property damage, or unsportsmanlike conduct.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p>
-                    1. Registration details (name, email, phone, college, and event choice) are
-                    collected solely for issuing VIBRANZA 2026 passes and event coordination.
-                  </p>
-                  <p>
-                    2. Your registration records are stored securely in our cloud database and are
-                    never sold to third-party advertisers.
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VIBRANZA 2026 | Feel The Beat</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Poppins:wght@300;400;500;600;700;800&family=Permanent+Marker&display=swap" rel="stylesheet">
+
+<style>
+:root{
+ --purple:#a855f7;
+ --pink:#ff28b9;
+ --dark:#080510;
+ --light:#f4d9ff;
 }
+
+*{margin:0;padding:0;box-sizing:border-box;scroll-behavior:smooth}
+
+body{
+ background:var(--dark);
+ color:white;
+ font-family:'Poppins',sans-serif;
+ overflow-x:hidden;
+}
+
+a{text-decoration:none;color:inherit}
+
+body:before{
+ content:"";
+ position:fixed;
+ inset:0;
+ pointer-events:none;
+ z-index:5;
+ opacity:.12;
+ background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+}
+
+nav{
+ position:fixed;
+ top:0;
+ width:100%;
+ z-index:100;
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ padding:20px 7%;
+ background:rgba(8,5,16,.75);
+ backdrop-filter:blur(18px);
+ border-bottom:1px solid #ffffff15;
+}
+
+.logo{
+ font-family:'Orbitron',sans-serif;
+ font-size:24px;
+ font-weight:900;
+ color:#e3a5ff;
+ text-shadow:0 0 20px var(--purple);
+}
+
+.navlinks{display:flex;gap:28px}
+.navlinks a{font-size:13px;transition:.3s}
+.navlinks a:hover{color:var(--pink);text-shadow:0 0 15px var(--pink)}
+
+.menu{display:none;background:none;border:0;color:white;font-size:25px;cursor:pointer}
+
+.hero{
+ min-height:100vh;
+ position:relative;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ text-align:center;
+ overflow:hidden;
+ background:
+ linear-gradient(180deg,rgba(8,5,16,.4),rgba(8,5,16,.85)),
+ url('https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1800') center/cover;
+}
+
+.hero:before{
+ content:"";
+ position:absolute;
+ inset:0;
+ background:radial-gradient(ellipse at center,#7c21d544,transparent 65%);
+}
+
+.hero-content{position:relative;z-index:2;padding:120px 20px 50px}
+
+.kicker{
+ letter-spacing:7px;
+ color:#e8aaff;
+ font-size:12px;
+ font-weight:600;
+}
+
+.hero h1{
+ font-family:'Orbitron',sans-serif;
+ font-size:clamp(48px,10vw,120px);
+ font-weight:900;
+ letter-spacing:-5px;
+ margin:25px 0;
+ background:linear-gradient(90deg,#fff,#c77bff,#ff38c8);
+ -webkit-background-clip:text;
+ background-clip:text;
+ color:transparent;
+ filter:drop-shadow(0 0 25px #ad45ff88);
+ animation:glow 3s infinite alternate;
+}
+
+@keyframes glow{
+ from{filter:drop-shadow(0 0 10px #ad45ff66)}
+ to{filter:drop-shadow(0 0 35px #d14dff)}
+}
+
+.hero h2{
+ font-family:'Permanent Marker',cursive;
+ font-size:clamp(20px,4vw,32px);
+ color:#f2d3ff;
+}
+
+.hero-details{
+ display:flex;
+ justify-content:center;
+ flex-wrap:wrap;
+ gap:30px;
+ margin:30px 0;
+ color:#eee;
+ font-size:14px;
+}
+
+.btn{
+ display:inline-block;
+ padding:15px 35px;
+ border-radius:50px;
+ background:linear-gradient(100deg,#8b31ff,#ff29bc);
+ box-shadow:0 0 20px #a53cff88;
+ font-weight:700;
+ font-size:13px;
+ border:1px solid #ffffff55;
+ transition:.3s;
+ cursor:pointer;
+}
+
+.btn:hover{
+ transform:translateY(-5px) scale(1.04);
+ box-shadow:0 0 40px #c45aff;
+}
+
+.outline-btn{
+ display:inline-block;
+ padding:14px 30px;
+ border:1px solid #c77bff;
+ border-radius:50px;
+ margin-left:10px;
+ font-size:13px;
+ transition:.3s;
+}
+
+.outline-btn:hover{background:#9c40ff33}
+
+.countdown{
+ display:flex;
+ justify-content:center;
+ gap:12px;
+ margin-top:50px;
+ flex-wrap:wrap;
+}
+
+.time{
+ min-width:85px;
+ padding:17px;
+ background:#190c2caa;
+ border:1px solid #a94bff88;
+ border-radius:15px;
+ box-shadow:0 0 20px #8b31ff33;
+}
+
+.time h3{
+ font-family:'Orbitron';
+ font-size:30px;
+ color:#e9baff;
+}
+
+.time p{font-size:10px;letter-spacing:2px;color:#c9b6d8}
+
+section{padding:100px 8%;position:relative}
+
+.section-label{
+ color:var(--pink);
+ letter-spacing:5px;
+ font-size:11px;
+ font-weight:700;
+ text-align:center;
+}
+
+.section-title{
+ font-family:'Orbitron';
+ text-align:center;
+ font-size:clamp(27px,5vw,43px);
+ margin:15px 0;
+ color:#e7baff;
+}
+
+.section-desc{
+ text-align:center;
+ max-width:650px;
+ margin:auto;
+ color:#bdb1cb;
+ line-height:1.8;
+ font-size:14px;
+}
+
+.about{
+ background:linear-gradient(180deg,#0c0618,#130821);
+}
+
+.cards{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+ gap:22px;
+ margin-top:45px;
+}
+
+.card{
+ background:linear-gradient(145deg,#26123b,#100b1d);
+ padding:28px;
+ border:1px solid #9b4ad944;
+ border-radius:20px;
+ transition:.35s;
+}
+
+.card:hover{
+ transform:translateY(-10px);
+ border-color:#dc76ff;
+ box-shadow:0 0 30px #a53cff44;
+}
+
+.card-icon{font-size:38px}
+.card h3{margin:17px 0 10px;color:#edc5ff}
+.card p{font-size:13px;color:#bcb1ca;line-height:1.7}
+
+.schedule{background:#090511}
+
+.schedule-grid{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+ gap:25px;
+ max-width:1000px;
+ margin:45px auto;
+}
+
+.day{
+ background:#160d25;
+ border:1px solid #7532a6;
+ border-radius:20px;
+ padding:28px;
+ box-shadow:0 0 25px #7f29be22;
+}
+
+.day h3{color:#e3a5ff;font-family:'Orbitron';margin-bottom:25px}
+
+.timeline{
+ border-left:2px solid #a855f7;
+ padding-left:20px;
+}
+
+.timeline-item{
+ position:relative;
+ padding-bottom:24px;
+}
+
+.timeline-item:before{
+ content:"";
+ position:absolute;
+ left:-27px;
+ top:5px;
+ width:11px;
+ height:11px;
+ background:#e15bff;
+ border-radius:50%;
+ box-shadow:0 0 15px #df52ff;
+}
+
+.timeline-item span{color:#d38aff;font-size:12px}
+.timeline-item h4{margin:5px 0;font-size:14px}
+.timeline-item p{font-size:12px;color:#aaa}
+
+.performers{
+ background:radial-gradient(ellipse at center,#281044,#0b0613 75%);
+}
+
+.artist{
+ padding:0;
+ overflow:hidden;
+}
+
+.artist img{
+ width:100%;
+ height:190px;
+ object-fit:cover;
+ display:block;
+ transition:.5s;
+}
+
+.artist:hover img{transform:scale(1.08)}
+
+.artist-info{padding:20px}
+.artist-info h3{margin:0 0 5px}
+.artist-info p{color:#d68cff}
+
+.events{background:#10091a}
+
+.event-card{
+ min-height:180px;
+ display:flex;
+ flex-direction:column;
+ justify-content:space-between;
+}
+
+.event-card .btn{margin-top:20px;align-self:flex-start;padding:10px 18px}
+
+.venue{
+ background:linear-gradient(120deg,#130920,#080510);
+}
+
+.venue-box{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:30px;
+ align-items:center;
+ margin-top:45px;
+}
+
+.venue-box img{
+ width:100%;
+ height:320px;
+ object-fit:cover;
+ border-radius:20px;
+ border:1px solid #a855f7;
+}
+
+.venue-text h3{
+ font-family:'Orbitron';
+ font-size:24px;
+ margin-bottom:20px;
+ color:#e4b3ff;
+}
+
+.venue-text p{
+ color:#c4b5d0;
+ margin:15px 0;
+ font-size:14px;
+ line-height:1.8;
+}
+
+.register{
+ background:radial-gradient(ellipse at center,#29103e,#090511 75%);
+}
+
+.form-box{
+ max-width:650px;
+ margin:40px auto 0;
+ padding:35px;
+ border:1px solid #a855f766;
+ border-radius:22px;
+ background:#170d25cc;
+ box-shadow:0 0 35px #8f36ff22;
+}
+
+.form-grid{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:18px;
+}
+
+.form-group{display:flex;flex-direction:column;gap:8px}
+.form-group.full{grid-column:1/-1}
+
+label{font-size:12px;color:#e3b5ff}
+
+input,select{
+ width:100%;
+ padding:14px;
+ border-radius:9px;
+ border:1px solid #75489a;
+ background:#0c0714;
+ color:white;
+ outline:none;
+ font-family:inherit;
+}
+
+input:focus,select:focus{border-color:#e05cff;box-shadow:0 0 12px #a855f744}
+
+.form-box button{width:100%;margin-top:25px}
+
+#message{
+ text-align:center;
+ color:#a9ffcc;
+ font-size:13px;
+ margin-top:18px;
+}
+
+footer{
+ background:#08040e;
+ border-top:1px solid #7738a7;
+ padding:45px 8%;
+ text-align:center;
+}
+
+footer .logo{margin-bottom:15px}
+footer p{color:#aaa;font-size:12px;margin:10px}
+
+.socials{margin:20px}
+.socials a{margin:0 12px;color:#dca4ff}
+
+.reveal{
+ opacity:0;
+ transform:translateY(35px);
+ transition:all .8s ease;
+}
+
+.reveal.show{opacity:1;transform:translateY(0)}
+
+@media(max-width:750px){
+ nav{padding:17px 5%}
+ .menu{display:block}
+ .navlinks{
+ display:none;
+ position:absolute;
+ top:70px;
+ left:0;
+ width:100%;
+ background:#11091d;
+ padding:25px;
+ flex-direction:column;
+ text-align:center;
+ gap:22px;
+ }
+ .navlinks.active{display:flex}
+ .hero h1{letter-spacing:-2px}
+ .venue-box{grid-template-columns:1fr}
+ .form-grid{grid-template-columns:1fr}
+ .form-group.full{grid-column:auto}
+ section{padding:75px 6%}
+ .outline-btn{margin:15px 0 0}
+}
+</style>
+</head>
+
+<body>
+
+<nav>
+ <a class="logo" href="#home">✦ VIBRANZA</a>
+
+ <button class="menu" onclick="toggleMenu()">☰</button>
+
+ <div class="navlinks" id="navlinks">
+  <a href="#home">HOME</a>
+  <a href="#about">ABOUT</a>
+  <a href="#schedule">SCHEDULE</a>
+  <a href="#performers">PERFORMERS</a>
+  <a href="#events">EVENTS</a>
+  <a href="#venue">VENUE</a>
+  <a href="#register">REGISTER</a>
+ </div>
+</nav>
+
+<!-- HERO -->
+
+<header class="hero" id="home">
+ <div class="hero-content">
+
+  <p class="kicker">THE ULTIMATE COLLEGE CULTURAL FEST</p>
+
+  <h1>VIBRANZA<br>2026</h1>
+
+  <h2>Feel The Beat. Live The Moment.</h2>
+
+  <div class="hero-details">
+   <span>📅 18–19 December 2026</span>
+   <span>📍 College Main Campus</span>
+  </div>
+
+  <a href="#register" class="btn">REGISTER NOW ↗</a>
+  <a href="#about" class="outline-btn">EXPLORE FEST ↓</a>
+
+  <div class="countdown">
+   <div class="time"><h3 id="days">00</h3><p>DAYS</p></div>
+   <div class="time"><h3 id="hours">00</h3><p>HOURS</p></div>
+   <div class="time"><h3 id="minutes">00</h3><p>MINUTES</p></div>
+   <div class="time"><h3 id="seconds">00</h3><p>SECONDS</p></div>
+  </div>
+
+ </div>
+</header>
+
+<!-- ABOUT -->
+
+<section class="about" id="about">
+ <p class="section-label">WELCOME TO OUR WORLD</p>
+ <h2 class="section-title">MORE THAN A FEST. IT'S A VIBE!</h2>
+ <p class="section-desc">
+  Two unforgettable days filled with music, dance, creativity,
+  competitions and celebration. Bring your talent, meet new people
+  and create memories that last forever.
+ </p>
+
+ <div class="cards">
+  <div class="card reveal"><div class="card-icon">🎤</div><h3>LIVE MUSIC</h3><p>Feel every beat with unforgettable live performances.</p></div>
+  <div class="card reveal"><div class="card-icon">💃</div><h3>DANCE BATTLES</h3><p>Show your moves and take over the dance floor.</p></div>
+  <div class="card reveal"><div class="card-icon">🏆</div><h3>COMPETITIONS</h3><p>Bring your talent and compete for exciting prizes.</p></div>
+  <div class="card reveal"><div class="card-icon">🎨</div><h3>CREATIVE ARTS</h3><p>Let your imagination become your masterpiece.</p></div>
+  <div class="card reveal"><div class="card-icon">🎮</div><h3>FUN ACTIVITIES</h3><p>Games, challenges and unlimited entertainment.</p></div>
+ </div>
+</section>
+
+<!-- SCHEDULE -->
+
+<section class="schedule" id="schedule">
+ <p class="section-label">PLAN YOUR EXPERIENCE</p>
+ <h2 class="section-title">THE FEST SCHEDULE</h2>
+ <p class="section-desc">Two days. Endless memories. Every moment matters.</p>
+
+ <div class="schedule-grid">
+  <div class="day reveal">
+   <h3>DAY 01 — 18 DEC</h3>
+   <div class="timeline">
+    <div class="timeline-item"><span>09:00 AM</span><h4>Opening Ceremony</h4><p>Welcome to VIBRANZA.</p></div>
+    <div class="timeline-item"><span>10:30 AM</span><h4>Dance Competition</h4><p>Solo and group performances.</p></div>
+    <div class="timeline-item"><span>01:00 PM</span><h4>Music & Singing</h4><p>Let the music take over.</p></div>
+    <div class="timeline-item"><span>04:00 PM</span><h4>Fashion Show</h4><p>Style meets confidence.</p></div>
+    <div class="timeline-item"><span>07:00 PM</span><h4>DJ Night</h4><p>Lights, beats and energy.</p></div>
+   </div>
+  </div>
+
+  <div class="day reveal">
+   <h3>DAY 02 — 19 DEC</h3>
+   <div class="timeline">
+    <div class="timeline-item"><span>09:00 AM</span><h4>Creative Events</h4><p>Explore your creativity.</p></div>
+    <div class="timeline-item"><span>11:00 AM</span><h4>Drama & Theatre</h4><p>Stories come alive.</p></div>
+    <div class="timeline-item"><span>02:00 PM</span><h4>Battle of Bands</h4><p>Music meets competition.</p></div>
+    <div class="timeline-item"><span>05:00 PM</span><h4>Prize Distribution</h4><p>Celebrate the winners.</p></div>
+    <div class="timeline-item"><span>07:00 PM</span><h4>Grand Finale</h4><p>One last unforgettable night.</p></div>
+   </div>
+  </div>
+ </div>
+</section>
+
+<!-- PERFORMERS -->
+
+<section class="performers" id="performers">
+ <p class="section-label">THE STARS OF THE SHOW</p>
+ <h2 class="section-title">PERFORMERS & HIGHLIGHTS</h2>
+
+ <div class="cards">
+  <div class="card artist reveal">
+   <img src="https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600" alt="Live music">
+   <div class="artist-info"><h3>THE ECHOES</h3><p>Live Band</p></div>
+  </div>
+
+  <div class="card artist reveal">
+   <img src="https://images.unsplash.com/photo-1571266028243-d220c9c3b3b2?w=600" alt="DJ">
+   <div class="artist-info"><h3>DJ VORTEX</h3><p>DJ Night</p></div>
+  </div>
+
+  <div class="card artist reveal">
+   <img src="https://images.unsplash.com/photo-1504609813442-a8924e83f76e?w=600" alt="Dance">
+   <div class="artist-info"><h3>RHYTHM REBELS</h3><p>Dance Crew</p></div>
+  </div>
+
+  <div class="card artist reveal">
+   <img src="https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=600" alt="Singer">
+   <div class="artist-info"><h3>SPECIAL GUEST</h3><p>To Be Announced</p></div>
+  </div>
+ </div>
+ <p class="section-desc" style="margin-top:25px">Sample performer names. Official announcements coming soon!</p>
+</section>
+
+<!-- EVENTS -->
+
+<section class="events" id="events">
+ <p class="section-label">SHOW YOUR TALENT</p>
+ <h2 class="section-title">PICK YOUR VIBE</h2>
+
+ <div class="cards">
+  <div class="card event-card reveal"><div><div class="card-icon">💃</div><h3>Dance</h3><p>Solo and group dance competitions.</p></div><a class="btn" href="#register">JOIN NOW</a></div>
+  <div class="card event-card reveal"><div><div class="card-icon">🎵</div><h3>Singing</h3><p>Show everyone your musical talent.</p></div><a class="btn" href="#register">JOIN NOW</a></div>
+  <div class="card event-card reveal"><div><div class="card-icon">📸</div><h3>Photography</h3><p>Capture moments and tell stories.</p></div><a class="btn" href="#register">JOIN NOW</a></div>
+  <div class="card event-card reveal"><div><div class="card-icon">🎭</div><h3>Drama</h3><p>Bring your imagination to life.</p></div><a class="btn" href="#register">JOIN NOW</a></div>
+  <div class="card event-card reveal"><div><div class="card-icon">🎮</div><h3>Gaming</h3><p>Challenge your friends and compete.</p></div><a class="btn" href="#register">JOIN NOW</a></div>
+  <div class="card event-card reveal"><div><div class="card-icon">🎨</div><h3>Digital Art</h3><p>Create something extraordinary.</p></div><a class="btn" href="#register">JOIN NOW</a></div>
+ </div>
+</section>
+
+<!-- VENUE -->
+
+<section class="venue" id="venue">
+ <p class="section-label">WHERE THE MAGIC HAPPENS</p>
+ <h2 class="section-title">FIND YOUR WAY TO THE VIBE</h2>
+
+ <div class="venue-box">
+  <img src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=900" alt="College campus">
+
+  <div class="venue-text">
+   <h3>COLLEGE MAIN CAMPUS</h3>
+   <p>📍 College Auditorium & Open Ground</p>
+   <p>📅 18–19 December 2026</p>
+   <p>🎉 Two days of music, culture and celebration.</p>
+   <a href="https://www.google.com/maps/search/?api=1&query=DR+RVR+NRI+College+Agiripalli" target="_blank" class="btn">GET DIRECTIONS ↗</a>
+  </div>
+ </div>
+</section>
+
+<!-- REGISTRATION -->
+
+<section class="register" id="register">
+ <p class="section-label">YOUR MOMENT STARTS HERE</p>
+ <h2 class="section-title">JOIN THE CELEBRATION!</h2>
+ <p class="section-desc">Be part of something unforgettable. Register for VIBRANZA 2026.</p>
+
+ <form class="form-box" id="regForm">
+  <div class="form-grid">
+
+   <div class="form-group">
+    <label>FULL NAME</label>
+    <input type="text" placeholder="Your name" required>
+   </div>
+
+   <div class="form-group">
+    <label>EMAIL ADDRESS</label>
+    <input type="email" placeholder="Your email" required>
+   </div>
+
+   <div class="form-group">
+    <label>PHONE NUMBER</label>
+    <input type="tel" pattern="[0-9]{10}" maxlength="10" placeholder="10 digit number" required>
+   </div>
+
+   <div class="form-group">
+    <label>COLLEGE NAME</label>
+    <input type="text" placeholder="Your college" required>
+   </div>
+
+   <div class="form-group">
+    <label>DEPARTMENT</label>
+    <input type="text" placeholder="CSE / ECE / EEE..." required>
+   </div>
+
+   <div class="form-group">
+    <label>YEAR OF STUDY</label>
+    <select required>
+     <option value="">Select year</option>
+     <option>1st Year</option>
+     <option>2nd Year</option>
+     <option>3rd Year</option>
+     <option>4th Year</option>
+    </select>
+   </div>
+
+   <div class="form-group">
+    <label>SELECT EVENT</label>
+    <select required>
+     <option value="">Choose event</option>
+     <option>Dance</option>
+     <option>Singing</option>
+     <option>Photography</option>
+     <option>Drama</option>
+     <option>Gaming</option>
+     <option>Digital Art</option>
+     <option>DJ Night</option>
+     <option>Multiple Events</option>
+    </select>
+   </div>
+
+   <div class="form-group">
+    <label>PARTICIPATION</label>
+    <select required>
+     <option value="">Select type</option>
+     <option>Individual</option>
+     <option>Team</option>
+    </select>
+   </div>
+
+  </div>
+
+  <button class="btn" type="submit">SUBMIT REGISTRATION ↗</button>
+  <p id="message"></p>
+ </form>
+</section>
+
+<!-- FOOTER -->
+
+<footer>
+ <div class="logo">✦ VIBRANZA 2026</div>
+ <p>One Campus. A Thousand Memories.</p>
+ <div class="socials">
+  <a href="#">INSTAGRAM</a>
+  <a href="#">YOUTUBE</a>
+  <a href="#">SPOTIFY</a>
+ </div>
+ <p>Contact: events@college.edu</p>
+ <p>© 2026 VIBRANZA. All Rights Reserved.</p>
+</footer>
+
+<script>
+
+// MOBILE MENU
+function toggleMenu(){
+ document.getElementById("navlinks").classList.toggle("active");
+}
+
+document.querySelectorAll(".navlinks a").forEach(link=>{
+ link.addEventListener("click",()=>{
+  document.getElementById("navlinks").classList.remove("active");
+ });
+});
+
+// COUNTDOWN
+const eventDate = new Date("December 18, 2026 09:00:00").getTime();
+
+function updateCountdown(){
+ const now = Date.now();
+ let distance = eventDate - now;
+
+ if(distance < 0){
+  ["days","hours","minutes","seconds"].forEach(id=>{
+   document.getElementById(id).textContent="00";
+  });
+  return;
+ }
+
+ const days = Math.floor(distance/(1000*60*60*24));
+ const hours = Math.floor((distance%(1000*60*60*24))/(1000*60*60));
+ const minutes = Math.floor((distance%(1000*60*60))/(1000*60));
+ const seconds = Math.floor((distance%(1000*60))/1000);
+
+ document.getElementById("days").textContent=days;
+ document.getElementById("hours").textContent=String(hours).padStart(2,"0");
+ document.getElementById("minutes").textContent=String(minutes).padStart(2,"0");
+ document.getElementById("seconds").textContent=String(seconds).padStart(2,"0");
+}
+
+updateCountdown();
+setInterval(updateCountdown,1000);
+
+// SCROLL ANIMATION
+const observer = new IntersectionObserver(entries=>{
+ entries.forEach(entry=>{
+  if(entry.isIntersecting){
+   entry.target.classList.add("show");
+  }
+ });
+},{threshold:0.12});
+
+document.querySelectorAll(".reveal").forEach(el=>{
+ observer.observe(el);
+});
+
+// DEMO REGISTRATION
+document.getElementById("regForm").addEventListener("submit",function(e){
+ e.preventDefault();
+
+ const registrationId = "VIB"+Math.floor(100000+Math.random()*900000);
+
+ document.getElementById("message").textContent =
+ "🎉 Demo registration received! Your reference ID: "+registrationId+
+ ". Connect a backend to save registrations.";
+
+ this.reset();
+});
+
+</script>
+</body>
+</html>
